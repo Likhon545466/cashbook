@@ -25,6 +25,20 @@ Designed for personal use with a focus on:
 - 🎯 Simple money tracking
 - 📊 Clear financial overview
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/Home.png" width="220">
+  <img src="screenshots/AddTransaction.png" width="220">
+  <img src="screenshots/Reports.png" width="220">
+  <img src="screenshots/Transaction.png" width="220">
+</p>
+<p align="center">
+  <img src="screenshots/Debt.png" width="220">
+  <img src="screenshots/Settings.png" width="220">
+  <img src="screenshots/Savings.png" width="220">
+</p>
+
 ## ✨ Features
 
 ### 💵 Transactions
@@ -60,14 +74,6 @@ Designed for personal use with a focus on:
 - Light / Dark theme
 - Dynamic color support
 - Custom accent colors
-
-## 📸 Screenshots
-
-<p align="center">
-  <img src="screenshots/Home.png" width="220">
-  <img src="screenshots/AddTransaction.png" width="220">
-  <img src="screenshots/Reports.png" width="220">
-</p>
 
 ## 🛠 Built With
 
