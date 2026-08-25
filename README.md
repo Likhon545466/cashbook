@@ -76,12 +76,6 @@ Designed for personal use with a focus on:
 - SQLite
 - Provider State Management
 
-## 📦 Download
-
-Get the latest APK from:
-
-[Download Latest Release](../../releases/latest)
-
 ## 🚀 Development
 
 Clone the repository:
