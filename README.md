@@ -35,6 +35,8 @@ Designed for personal use with a focus on:
 
   <img src="screenshots/Debt.png" width="220">
   <img src="screenshots/Settings.png" width="220">
+  </p>
+  <p align="left">
   <img src="screenshots/Savings.png" width="220">
 </p>
 
