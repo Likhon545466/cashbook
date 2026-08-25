@@ -32,8 +32,7 @@ Designed for personal use with a focus on:
   <img src="screenshots/AddTransaction.png" width="220">
   <img src="screenshots/Reports.png" width="220">
   <img src="screenshots/Transaction.png" width="220">
-</p>
-<p align="center">
+
   <img src="screenshots/Debt.png" width="220">
   <img src="screenshots/Settings.png" width="220">
   <img src="screenshots/Savings.png" width="220">
