@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A simple, fast and offline-first personal finance management app built with Flutter.
+  A simple, fast and offline-first personal finance management app.
 </p>
 
 <p align="center">
