@@ -31,7 +31,7 @@ set BACKUP_NAME=archives\lib_backup_%DATE%_%TIME%_%RANDOM%.zip
 echo Creating backup...
 echo.
 
-powershell -NoProfile -Command "Compress-Archive -Path '.\lib\*' -DestinationPath '%BACKUP_NAME%' -Force"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '.\lib\*' -DestinationPath '%BACKUP_NAME%' -Force"
 
 if exist "%BACKUP_NAME%" (
     echo.
