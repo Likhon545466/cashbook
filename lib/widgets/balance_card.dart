@@ -89,7 +89,9 @@ class BalanceCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                isHidden ? '৳ ••••••' : MoneyFormatter.currency(balance),
+                isHidden
+                    ? '${MoneyFormatter.currencySymbol} ••••••'
+                    : MoneyFormatter.currency(balance),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 34,

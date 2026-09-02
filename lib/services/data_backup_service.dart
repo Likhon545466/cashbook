@@ -16,6 +16,7 @@ import '../models/debt_due_extension_model.dart';
 import '../models/debt_payment_model.dart';
 import '../models/savings_transfer_model.dart';
 import '../models/transaction_model.dart';
+import 'backup_encryption_service.dart';
 import 'database_service.dart';
 
 class DataBackupService {
@@ -32,7 +33,7 @@ class DataBackupService {
     return file.writeAsString(contents, flush: true);
   }
 
-  Future<void> shareBackup() async {
+  Future<Map<String, dynamic>> _buildBackupPayload() async {
     final transactions = await _databaseService.getTransactions();
     final categories = await _databaseService.getCustomCategories();
     final settings = await _databaseService.getAllSettings();
@@ -42,7 +43,7 @@ class DataBackupService {
     final debtPayments = await _databaseService.getDebtPayments();
     final debtDueExtensions = await _databaseService.getDebtDueExtensions();
 
-    final payload = {
+    return {
       'app': 'CashBook',
       'backupVersion': 4,
       'createdAt': DateTime.now().toIso8601String(),
@@ -55,7 +56,10 @@ class DataBackupService {
       'debtDueExtensions': debtDueExtensions.map((e) => e.toMap()).toList(),
       'settings': settings,
     };
+  }
 
+  Future<void> shareBackup() async {
+    final payload = await _buildBackupPayload();
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final file = await _writeTempFile(
       name: 'CashBook_backup_$stamp.json',
@@ -67,6 +71,28 @@ class DataBackupService {
         files: [XFile(file.path)],
         subject: 'CashBook Backup',
         text: 'CashBook local backup',
+      ),
+    );
+  }
+
+  Future<void> shareEncryptedBackup(String password) async {
+    final payload = await _buildBackupPayload();
+    final encrypted = BackupEncryptionService.encryptJson(
+      payload: payload,
+      password: password,
+    );
+
+    final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final file = await _writeTempFile(
+      name: 'CashBook_encrypted_backup_$stamp.json',
+      contents: const JsonEncoder.withIndent('  ').convert(encrypted),
+    );
+
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'CashBook Encrypted Backup',
+        text: 'CashBook password-protected backup (AES-256)',
       ),
     );
   }
@@ -620,7 +646,9 @@ class DataBackupService {
     return buffer.toString();
   }
 
-  Future<BackupRestoreResult?> pickAndReadBackup() async {
+  Future<BackupRestoreResult?> pickAndReadBackup({
+    Future<String?> Function()? onPasswordRequired,
+  }) async {
     const typeGroup = XTypeGroup(
       label: 'CashBook Backup',
       extensions: ['json'],
@@ -629,8 +657,30 @@ class DataBackupService {
     final file = await openFile(acceptedTypeGroups: [typeGroup]);
     if (file == null) return null;
 
-    final decoded = jsonDecode(await file.readAsString());
+    var decoded = jsonDecode(await file.readAsString());
     if (decoded is! Map<String, dynamic> || decoded['app'] != 'CashBook') {
+      throw const FormatException('Invalid CashBook backup.');
+    }
+
+    if (BackupEncryptionService.isEncryptedBackup(decoded)) {
+      if (onPasswordRequired == null) {
+        throw const FormatException('Password is required for encrypted backup.');
+      }
+
+      final password = await onPasswordRequired();
+      if (password == null || password.isEmpty) return null;
+
+      decoded = BackupEncryptionService.decryptJson(
+        encryptedEnvelope: decoded,
+        password: password,
+      );
+    }
+
+    return parseBackupData(decoded);
+  }
+
+  BackupRestoreResult parseBackupData(Map<String, dynamic> decoded) {
+    if (decoded['app'] != 'CashBook') {
       throw const FormatException('Invalid CashBook backup.');
     }
 

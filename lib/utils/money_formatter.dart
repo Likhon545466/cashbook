@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 class MoneyFormatter {
   MoneyFormatter._();
 
+  static String currencySymbol = '৳';
+
   static final NumberFormat _international = NumberFormat.decimalPattern(
     'en_US',
   );
@@ -12,5 +14,6 @@ class MoneyFormatter {
     return '$sign${_international.format(value.abs())}';
   }
 
-  static String currency(int value) => '৳${amount(value)}';
+  static String currency(int value, [String? symbol]) =>
+      '${symbol ?? currencySymbol}${amount(value)}';
 }

@@ -214,7 +214,10 @@ class _SmartAmountFieldState extends State<SmartAmountField> {
             hintText: widget.hintText,
             prefix: Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Text('৳', style: widget.prefixStyle),
+              child: Text(
+                MoneyFormatter.currencySymbol,
+                style: widget.prefixStyle,
+              ),
             ),
             contentPadding: widget.contentPadding,
             filled: widget.filled,

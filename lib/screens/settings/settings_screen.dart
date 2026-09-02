@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/security_provider.dart';
+import '../../providers/settings_provider.dart';
 import 'appearance_screen.dart';
 import 'budget_screen.dart';
 import 'category_management_screen.dart';
+import 'currency_screen.dart';
 import 'data_management_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -30,6 +32,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final security = context.watch<SecurityProvider>();
+    final settings = context.watch<SettingsProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -97,6 +100,18 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           _CardGroup(
             children: [
+              _Tile(
+                icon: Icons.currency_exchange_rounded,
+                title: 'Currency',
+                subtitle: 'Active: ${settings.currencyCode} (${settings.currencySymbol})',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CurrencyScreen(),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
               _Tile(
                 icon: Icons.category_outlined,
                 title: 'Categories',

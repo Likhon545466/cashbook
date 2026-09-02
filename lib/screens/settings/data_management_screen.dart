@@ -203,10 +203,76 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   Future<void> _backup() async {
     if (_busy) return;
 
+    final type = await showModalBottomSheet<_BackupType>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Create Backup',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Choose how you want to export your backup.',
+                style: Theme.of(sheetContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                onTap: () => Navigator.pop(sheetContext, _BackupType.standard),
+                leading: const _DataIcon(icon: Icons.description_outlined),
+                title: const Text(
+                  'Standard Backup (JSON)',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Readable JSON file containing all data',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+              ),
+              ListTile(
+                onTap: () => Navigator.pop(sheetContext, _BackupType.encrypted),
+                leading: const _DataIcon(icon: Icons.lock_outline_rounded),
+                title: const Text(
+                  'Encrypted Backup (AES-256)',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Password-protected client-side encryption for secure cloud storage',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || type == null) return;
+
+    String? password;
+    if (type == _BackupType.encrypted) {
+      password = await _promptPassword(
+        title: 'Set Backup Password',
+        subtitle:
+            'Enter a password to encrypt this backup. You will need this password to restore it.',
+        confirmPassword: true,
+      );
+      if (!mounted || password == null || password.isEmpty) return;
+    }
+
     setState(() => _busy = true);
 
     try {
-      await _service.shareBackup();
+      if (type == _BackupType.encrypted && password != null) {
+        await _service.shareEncryptedBackup(password);
+      } else {
+        await _service.shareBackup();
+      }
     } catch (error) {
       if (!mounted) return;
       _showError('Backup failed', error);
@@ -215,6 +281,97 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Future<String?> _promptPassword({
+    required String title,
+    required String subtitle,
+    bool confirmPassword = false,
+  }) async {
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    var obscure = true;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(title),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscure,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () =>
+                              setDialogState(() => obscure = !obscure),
+                        ),
+                      ),
+                    ),
+                    if (confirmPassword) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: confirmController,
+                        obscureText: obscure,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm Password',
+                          prefixIcon: Icon(Icons.lock_reset_rounded),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, null),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final pass = passwordController.text.trim();
+                    if (pass.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Password cannot be empty.')),
+                      );
+                      return;
+                    }
+                    if (confirmPassword && pass != confirmController.text.trim()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Passwords do not match.')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext, pass);
+                  },
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    passwordController.dispose();
+    confirmController.dispose();
+    return result;
   }
 
   Future<void> _exportCsv() async {
@@ -440,12 +597,16 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   Future<void> _restore() async {
     if (_busy) return;
 
-    setState(() => _busy = true);
-
     BackupRestoreResult? backup;
 
     try {
-      backup = await _service.pickAndReadBackup();
+      backup = await _service.pickAndReadBackup(
+        onPasswordRequired: () => _promptPassword(
+          title: 'Enter Backup Password',
+          subtitle:
+              'This backup is encrypted with AES-256. Enter the password to decrypt and restore it.',
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
       _showError('Could not read backup', error);
@@ -833,6 +994,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     );
   }
 }
+
+enum _BackupType { standard, encrypted }
 
 enum _PdfExportChoice { fullLedger, monthly, customRange }
 
