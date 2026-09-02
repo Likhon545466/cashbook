@@ -193,6 +193,28 @@ if errorlevel 1 (
 )
 
 REM ------------------------------------------------------------
+REM Keep only the latest 2 builds locally
+REM ------------------------------------------------------------
+set /a APK_COUNT=0
+for /f "delims=" %%F in ('dir /b /a-d /o-d "!OUTPUT_DIR!\CashBook-*.apk" 2^>nul') do (
+    set /a APK_COUNT+=1
+    if !APK_COUNT! GTR 2 (
+        del /Q "!OUTPUT_DIR!\%%F" >nul 2>nul
+    )
+)
+
+if exist "Release" (
+    copy /Y "!FINAL_APK!" "Release\!FINAL_NAME!" >nul 2>nul
+    set /a REL_COUNT=0
+    for /f "delims=" %%F in ('dir /b /a-d /o-d "Release\CashBook-*.apk" 2^>nul') do (
+        set /a REL_COUNT+=1
+        if !REL_COUNT! GTR 2 (
+            del /Q "Release\%%F" >nul 2>nul
+        )
+    )
+)
+
+REM ------------------------------------------------------------
 REM ONLY NOW save the new version.
 REM Failed builds never consume a version.
 REM ------------------------------------------------------------
@@ -206,6 +228,7 @@ echo Version      : v!NEW_VERSION_NAME!
 echo Build Number : !NEW_BUILD_NUMBER!
 echo APK Name     : !FINAL_NAME!
 echo Folder       : !OUTPUT_DIR!
+echo (Kept latest 2 builds locally)
 echo.
 echo Saved version file:
 echo %VERSION_FILE% = !NEW_FULL_VERSION!
