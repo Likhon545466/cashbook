@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../../providers/debt_provider.dart';
 import '../../providers/savings_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/csv_import_service.dart';
 import '../../services/data_backup_service.dart';
 import '../../services/data_integrity_service.dart';
 import '../../services/database_service.dart';
@@ -22,6 +24,7 @@ class DataManagementScreen extends StatefulWidget {
 class _DataManagementScreenState extends State<DataManagementScreen> {
   late final DataBackupService _service;
   late final DataIntegrityService _integrityService;
+  late final CsvImportService _csvService;
 
   bool _busy = false;
   int _transactionCount = 0;
@@ -34,6 +37,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     super.initState();
     _service = DataBackupService(DatabaseService.instance);
     _integrityService = DataIntegrityService(DatabaseService.instance);
+    _csvService = CsvImportService(DatabaseService.instance);
     _refreshStats();
   }
 
@@ -389,6 +393,218 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Future<void> _importCsv() async {
+    if (_busy) return;
+
+    try {
+      final transactionProvider = context.read<TransactionProvider>();
+      final categoryProvider = context.read<CategoryProvider>();
+
+      const typeGroup = XTypeGroup(
+        label: 'CSV files',
+        extensions: ['csv'],
+      );
+      final file = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (file == null || !mounted) return;
+
+      setState(() => _busy = true);
+      final content = await file.readAsString();
+
+      final preview = CsvImportService.parseCsv(
+        content,
+        existingTransactions: transactionProvider.transactions,
+      );
+
+      setState(() => _busy = false);
+      if (!mounted) return;
+
+      if (preview.totalRows == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The selected CSV file is empty or unreadable.'),
+          ),
+        );
+        return;
+      }
+
+      final shouldImport = await _showImportPreviewSheet(preview);
+      if (shouldImport != true || !mounted) return;
+
+      setState(() => _busy = true);
+
+      final validRows =
+          preview.rows.where((r) => r.isValid && !r.isDuplicate).toList();
+      final count = await _csvService.executeImport(validRows);
+
+      await Future.wait([
+        transactionProvider.loadTransactions(),
+        categoryProvider.loadCategories(),
+      ]);
+      await _refreshStats();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully imported $count transactions!'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError('CSV Import Failed', error);
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<bool?> _showImportPreviewSheet(CsvImportPreview preview) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final scheme = theme.colorScheme;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CSV Import Preview',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Found ${preview.totalRows} records in CSV statement.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _ImportStatChip(
+                      label: '${preview.validCount} to import',
+                      color: Colors.green,
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    if (preview.duplicateCount > 0) ...[
+                      _ImportStatChip(
+                        label: '${preview.duplicateCount} duplicates',
+                        color: Colors.orange,
+                        icon: Icons.copy_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (preview.invalidCount > 0)
+                      _ImportStatChip(
+                        label: '${preview.invalidCount} invalid',
+                        color: Colors.red,
+                        icon: Icons.error_outline_rounded,
+                      ),
+                  ],
+                ),
+                if (preview.discoveredCategories.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Discovered Categories',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final cat in preview.discoveredCategories.take(8))
+                        Chip(
+                          label: Text(cat),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          labelStyle: const TextStyle(fontSize: 11.5),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Text(
+                  'Sample Rows',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: preview.rows.take(6).length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final row = preview.rows[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          row.category.isNotEmpty ? row.category : 'No Category',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          DateFormat('dd MMM yyyy').format(row.date) +
+                              (row.note.isNotEmpty ? ' • ${row.note}' : ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          '${row.type == 'income' ? '+' : '-'}${row.amount}',
+                          style: TextStyle(
+                            color: row.type == 'income'
+                                ? Colors.green
+                                : Colors.red,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: preview.validCount > 0
+                            ? () => Navigator.pop(sheetContext, true)
+                            : null,
+                        child: Text('Import (${preview.validCount})'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _exportPdf() async {
@@ -926,23 +1142,23 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          const _SectionTitle('Export'),
+          const _SectionTitle('Import & Export'),
           const SizedBox(height: 10),
           Card(
             child: Column(
               children: [
                 ListTile(
                   enabled: !_busy,
-                  leading: const _DataIcon(icon: Icons.picture_as_pdf_outlined),
+                  leading: const _DataIcon(icon: Icons.file_upload_outlined),
                   title: const Text(
-                    'Export PDF Report',
+                    'Import Transactions from CSV',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: const Text(
-                    'Full ledger or colorful monthly summary with entries',
+                    'Import past statements, bank records or CashBook CSV exports',
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _exportPdf,
+                  onTap: _importCsv,
                 ),
                 const Divider(),
                 ListTile(
@@ -957,6 +1173,20 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: _exportCsv,
+                ),
+                const Divider(),
+                ListTile(
+                  enabled: !_busy,
+                  leading: const _DataIcon(icon: Icons.picture_as_pdf_outlined),
+                  title: const Text(
+                    'Export PDF Report',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Full ledger or colorful monthly summary with entries',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _exportPdf,
                 ),
               ],
             ),
@@ -1100,6 +1330,44 @@ class _DataIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
       ),
       child: Icon(icon, color: color, size: 21),
+    );
+  }
+}
+
+class _ImportStatChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _ImportStatChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

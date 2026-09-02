@@ -11,6 +11,8 @@ import '../../utils/money_formatter.dart';
 import '../../widgets/animated_progress_bar.dart';
 import '../settings/budget_screen.dart';
 import '../transactions/add_transaction_screen.dart';
+import 'widgets/donut_chart.dart';
+import 'widgets/cashflow_bar_chart.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -23,6 +25,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTimeRange? _customRange;
   bool _useCustomRange = false;
+  int _chartTab = 0; // 0 = Expense, 1 = Income
 
   @override
   void initState() {
@@ -179,6 +182,59 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return null;
     }
     return ((current - previous) / previous) * 100;
+  }
+
+  List<DonutChartData> _buildDonutData(
+    List<MapEntry<String, int>> categories,
+    BuildContext context,
+  ) {
+    const palette = [
+      Color(0xFF6366F1), // Indigo
+      Color(0xFFEC4899), // Pink
+      Color(0xFF06B6D4), // Cyan
+      Color(0xFFF59E0B), // Amber
+      Color(0xFF10B981), // Emerald
+      Color(0xFF8B5CF6), // Purple
+      Color(0xFFF97316), // Orange
+      Color(0xFF14B8A6), // Teal
+      Color(0xFFEF4444), // Red
+      Color(0xFF3B82F6), // Blue
+      Color(0xFF84CC16), // Lime
+      Color(0xFF0EA5E9), // Sky
+    ];
+
+    return [
+      for (var i = 0; i < categories.length; i++)
+        DonutChartData(
+          label: categories[i].key,
+          value: categories[i].value,
+          color: palette[i % palette.length],
+        ),
+    ];
+  }
+
+  List<MonthlyCashflowData> _getHistoricalCashflow(
+    TransactionProvider provider,
+  ) {
+    final result = <MonthlyCashflowData>[];
+    final now = DateTime.now();
+
+    for (var i = 5; i >= 0; i--) {
+      final d = DateTime(now.year, now.month - i, 1);
+      final monthLabel = DateFormat('MMM').format(d);
+      final inc = provider.incomeForMonth(d);
+      final exp = provider.expenseForMonth(d);
+      result.add(
+        MonthlyCashflowData(
+          monthLabel: monthLabel,
+          income: inc,
+          expense: exp,
+          date: d,
+        ),
+      );
+    }
+
+    return result;
   }
 
   @override
@@ -499,6 +555,66 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ),
               ],
+              if (expense > 0 || income > 0) ...[
+                const SizedBox(height: 14),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Visual Breakdown',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _ChartTabButton(
+                                    label: 'Expense',
+                                    isSelected: _chartTab == 0,
+                                    color: AppSemanticColors.expense(context),
+                                    onTap: () => setState(() => _chartTab = 0),
+                                  ),
+                                  _ChartTabButton(
+                                    label: 'Income',
+                                    isSelected: _chartTab == 1,
+                                    color: AppSemanticColors.income(context),
+                                    onTap: () => setState(() => _chartTab = 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        DonutChart(
+                          items: _buildDonutData(
+                            _chartTab == 0 ? expenseCategories : incomeCategories,
+                            context,
+                          ),
+                          centerTitle: _chartTab == 0 ? 'Total Spent' : 'Total Earned',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              CashflowBarChart(
+                months: _getHistoricalCashflow(provider),
+              ),
               const SizedBox(height: 24),
               _BreakdownSection(
                 title: 'Expense Breakdown',
@@ -856,6 +972,44 @@ class _ReportEmpty extends StatelessWidget {
               label: const Text('Add transaction'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChartTabButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ChartTabButton({
+    required this.label,
+    required this.isSelected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? color : Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            fontSize: 12.5,
+          ),
         ),
       ),
     );
