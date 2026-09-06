@@ -6,6 +6,7 @@ import 'package:cashbook/models/debt_model.dart';
 import 'package:cashbook/models/debt_payment_model.dart';
 import 'package:cashbook/models/debt_due_extension_model.dart';
 import 'package:cashbook/models/category_model.dart';
+import 'package:cashbook/models/recurring_transaction_model.dart';
 
 void main() {
   group('Data Models Unit Tests', () {
@@ -149,6 +150,51 @@ void main() {
       expect(from.oldDueDate, equals(DateTime(2026, 9, 1)));
       expect(from.newDueDate, equals(DateTime(2026, 10, 1)));
       expect(from.note, equals('Agreed 1 month extension'));
+    });
+
+    test('RecurringTransaction toMap, fromMap, and due status', () {
+      const item = RecurringTransaction(
+        id: 7,
+        title: 'Apartment Rent',
+        amount: 15000,
+        type: 'expense',
+        category: 'Rent',
+        dayOfMonth: 5,
+        note: 'Flat 4B',
+        lastAppliedMonth: '2026-08',
+        isActive: true,
+      );
+
+      final map = item.toMap();
+      expect(map['id'], equals(7));
+      expect(map['title'], equals('Apartment Rent'));
+      expect(map['amount'], equals(15000));
+      expect(map['type'], equals('expense'));
+      expect(map['category'], equals('Rent'));
+      expect(map['dayOfMonth'], equals(5));
+      expect(map['lastAppliedMonth'], equals('2026-08'));
+      expect(map['isActive'], equals(1));
+
+      final from = RecurringTransaction.fromMap(map);
+      expect(from.id, equals(7));
+      expect(from.cleanTitle, equals('Apartment Rent'));
+      expect(from.isIncome, isFalse);
+      expect(from.isActive, isTrue);
+
+      // When checking on day 6 of Sep 2026, it is due because day 6 >= day 5 and last applied was Aug
+      expect(from.isDueForMonth(DateTime(2026, 9, 6)), isTrue);
+
+      // When checking on day 3 of Sep 2026, it is not yet due
+      expect(from.isDueForMonth(DateTime(2026, 9, 3)), isFalse);
+
+      // Once applied for Sep 2026, it is no longer due
+      final applied = from.copyWith(lastAppliedMonth: '2026-09');
+      expect(applied.isDueForMonth(DateTime(2026, 9, 6)), isFalse);
+
+      // When undoing/clearing lastAppliedMonth, it becomes due again
+      final undone = applied.copyWith(clearLastAppliedMonth: true);
+      expect(undone.lastAppliedMonth, isNull);
+      expect(undone.isDueForMonth(DateTime(2026, 9, 6)), isTrue);
     });
   });
 }

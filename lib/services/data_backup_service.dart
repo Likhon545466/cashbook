@@ -33,7 +33,7 @@ class DataBackupService {
     return file.writeAsString(contents, flush: true);
   }
 
-  Future<Map<String, dynamic>> _buildBackupPayload() async {
+  Future<Map<String, dynamic>> buildBackupPayload() async {
     final transactions = await _databaseService.getTransactions();
     final categories = await _databaseService.getCustomCategories();
     final settings = await _databaseService.getAllSettings();
@@ -58,8 +58,13 @@ class DataBackupService {
     };
   }
 
+  Future<void> restoreFromJsonMap(Map<String, dynamic> decoded) async {
+    final parsed = parseBackupData(decoded);
+    await restoreBackup(parsed);
+  }
+
   Future<void> shareBackup() async {
-    final payload = await _buildBackupPayload();
+    final payload = await buildBackupPayload();
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final file = await _writeTempFile(
       name: 'CashBook_backup_$stamp.json',
@@ -76,7 +81,7 @@ class DataBackupService {
   }
 
   Future<void> shareEncryptedBackup(String password) async {
-    final payload = await _buildBackupPayload();
+    final payload = await buildBackupPayload();
     final encrypted = BackupEncryptionService.encryptJson(
       payload: payload,
       password: password,

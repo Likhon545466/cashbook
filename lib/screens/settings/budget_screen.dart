@@ -10,6 +10,7 @@ import '../../providers/transaction_provider.dart';
 import '../../utils/amount_expression.dart';
 import '../../utils/money_formatter.dart';
 import '../../widgets/animated_progress_bar.dart';
+import '../../widgets/month_picker_dialog.dart';
 import '../../widgets/smart_amount_field.dart';
 
 class BudgetScreen extends StatefulWidget {
@@ -238,12 +239,39 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     Expanded(
                       child: Column(
                         children: [
-                          Text(
-                            DateFormat(
-                              'MMMM yyyy',
-                            ).format(budgets.selectedMonth),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.titleMedium,
+                          InkWell(
+                            onTap: () async {
+                              final picked = await MonthPickerDialog.show(
+                                context,
+                                initialMonth: budgets.selectedMonth,
+                              );
+                              if (picked != null && mounted) {
+                                await HapticFeedback.selectionClick();
+                                await budgets.loadMonth(picked);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    DateFormat(
+                                      'MMMM yyyy',
+                                    ).format(budgets.selectedMonth),
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.arrow_drop_down_rounded, size: 20),
+                                ],
+                              ),
+                            ),
                           ),
                           if (!isCurrentMonth) ...[
                             const SizedBox(height: 2),

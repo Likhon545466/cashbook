@@ -7,8 +7,10 @@ import '../../core/theme/app_colors.dart';
 import '../../models/transaction_model.dart';
 import '../../providers/budget_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/statement_export_service.dart';
 import '../../utils/money_formatter.dart';
 import '../../widgets/animated_progress_bar.dart';
+import '../../widgets/month_picker_dialog.dart';
 import '../settings/budget_screen.dart';
 import '../transactions/add_transaction_screen.dart';
 import 'widgets/donut_chart.dart';
@@ -325,6 +327,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Export Statement',
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: () {
+              StatementExportService.showExportSheet(
+                context,
+                bookTitle: provider.activeBookTitle,
+                transactions: items,
+                totalIncome: income,
+                totalExpense: expense,
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -358,12 +376,52 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         icon: const Icon(Icons.chevron_left_rounded),
                       ),
                       Expanded(
-                        child: Text(
-                          periodLabel,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        child: InkWell(
+                          onTap: _useCustomRange
+                              ? _pickCustomRange
+                              : () async {
+                                  final budget = context.read<BudgetProvider>();
+                                  final picked = await MonthPickerDialog.show(
+                                    context,
+                                    initialMonth: _selectedMonth,
+                                  );
+                                  if (picked != null && mounted) {
+                                    await HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _selectedMonth = picked;
+                                      _useCustomRange = false;
+                                    });
+                                    if (mounted) {
+                                      await budget.loadMonth(picked);
+                                    }
+                                  }
+                                },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    periodLabel,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                if (!_useCustomRange) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.arrow_drop_down_rounded, size: 20),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       IconButton(

@@ -10,7 +10,7 @@ import '../../providers/savings_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../utils/money_formatter.dart';
-import '../../widgets/balance_card.dart';
+import '../../widgets/book_picker_sheet.dart';
 import '../../widgets/transaction_tile.dart';
 import '../debt/debt_screen.dart';
 import '../savings/savings_screen.dart';
@@ -39,10 +39,26 @@ class _HomeScreenState extends State<HomeScreen> {
     await HapticFeedback.selectionClick();
     if (!mounted) return;
 
+    final transactions = context.read<TransactionProvider>();
+    final initialDate = transactions.isCustomBookSelected
+        ? DateTime.now()
+        : (transactions.isCurrentMonthSelected
+            ? DateTime.now()
+            : DateTime(
+                transactions.selectedMonth.year,
+                transactions.selectedMonth.month,
+                1,
+                12,
+                0,
+              ));
+
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => AddTransactionScreen(initialType: type),
+        builder: (_) => AddTransactionScreen(
+          initialType: type,
+          initialDate: initialDate,
+        ),
       ),
     );
 
@@ -54,6 +70,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _pickBookMonth() async {
+    await HapticFeedback.selectionClick();
+    if (!mounted) return;
+    await BookPickerSheet.show(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final transactions = context.watch<TransactionProvider>();
@@ -61,25 +83,51 @@ class _HomeScreenState extends State<HomeScreen> {
     final debts = context.watch<DebtProvider>();
     final settings = context.watch<SettingsProvider>();
 
-    final totalMoney = transactions.balance;
+    final activeBookTitle = transactions.activeBookTitle;
+    final isCustomBook = transactions.isCustomBookSelected;
+    final bookIncome = transactions.currentBookIncome;
+    final bookExpense = transactions.currentBookExpense;
+    final bookNet = transactions.currentBookNet;
+
     final savingsBalance = savings.balance;
-    final availableBalance = totalMoney - savingsBalance;
-    final monthlyNet = transactions.monthlyIncome - transactions.monthlyExpense;
+    final bookTransactions = transactions.currentBookTransactions;
+
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
+        toolbarHeight: 64,
+        titleSpacing: 16,
         title: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('CashBook', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 2),
             Text(
-              DateFormat('EEEE, dd MMMM').format(DateTime.now()),
-              style: Theme.of(context).textTheme.bodySmall,
+              'CashBook',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              DateFormat('EEE, dd MMM yyyy').format(DateTime.now()),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
+        actions: [
+          _BookSelectorPill(
+            title: activeBookTitle,
+            isCustomBook: isCustomBook,
+            onTap: _pickBookMonth,
+          ),
+          const SizedBox(width: 16),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -90,225 +138,67 @@ class _HomeScreenState extends State<HomeScreen> {
           ]);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            BalanceCard(
-              balance: availableBalance,
+            // Unified Book Hero Card
+            _BookHeroCard(
+              monthLabel: activeBookTitle,
+              netBalance: bookNet,
+              income: bookIncome,
+              expense: bookExpense,
               isHidden: settings.hideBalance,
               onToggleVisibility: settings.toggleBalanceVisibility,
+              onCashIn: () => _openAdd('income'),
+              onCashOut: () => _openAdd('expense'),
             ),
             const SizedBox(height: 14),
+
+            // Compact 2-Column Glance Strip (Savings & Debt)
             Row(
               children: [
                 Expanded(
-                  child: _ActionCard(
-                    title: 'Cash In',
-                    icon: Icons.south_west_rounded,
-                    color: AppSemanticColors.income(context),
-                    onTap: () => _openAdd('income'),
+                  child: _GlanceCard(
+                    icon: Icons.savings_outlined,
+                    label: 'Savings',
+                    value: settings.hideBalance
+                        ? '••••'
+                        : MoneyFormatter.currency(savingsBalance),
+                    color: AppSemanticColors.savings(context),
+                    onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SavingsScreen()),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _ActionCard(
-                    title: 'Cash Out',
-                    icon: Icons.north_east_rounded,
-                    color: AppSemanticColors.expense(context),
-                    onTap: () => _openAdd('expense'),
+                  child: _GlanceCard(
+                    icon: Icons.handshake_outlined,
+                    label: 'Debt',
+                    value: settings.hideBalance
+                        ? '••••'
+                        : (debts.totalYouOwe > 0
+                            ? '-${MoneyFormatter.currency(debts.totalYouOwe)}'
+                            : (debts.totalOwedToYou > 0
+                                ? '+${MoneyFormatter.currency(debts.totalOwedToYou)}'
+                                : '৳0')),
+                    color: debts.totalYouOwe > 0
+                        ? scheme.error
+                        : scheme.primary,
+                    subtitle: debts.overdueCount > 0
+                        ? '${debts.overdueCount} overdue'
+                        : (debts.openCount > 0 ? '${debts.openCount} open' : null),
+                    onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DebtScreen()),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 22),
-            _SectionHeader(
-              title: 'Savings / Reserve',
-              action: 'Manage',
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const SavingsScreen()),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              child: InkWell(
-                onTap: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SavingsScreen()),
-                ),
-                borderRadius: BorderRadius.circular(22),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppSemanticColors.savings(
-                            context,
-                          ).withValues(alpha: 0.11),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.savings_outlined,
-                          color: AppSemanticColors.savings(context),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _SavingsMetric(
-                          label: 'Reserved',
-                          value: settings.hideBalance
-                              ? '••••'
-                              : MoneyFormatter.currency(savingsBalance),
-                          color: AppSemanticColors.savings(context),
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 38,
-                        color: Theme.of(context).dividerColor,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _SavingsMetric(
-                          label: 'Available',
-                          value: settings.hideBalance
-                              ? '••••'
-                              : MoneyFormatter.currency(availableBalance),
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (savingsBalance > totalMoney) ...[
-              const SizedBox(height: 10),
-              Card(
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppSemanticColors.warning(context),
-                  ),
-                  title: const Text(
-                    'Savings exceeds current total cash',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: const Text(
-                    'Review savings or edited transactions.',
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 22),
-            _SectionHeader(
-              title: 'Debt',
-              action: 'Manage',
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const DebtScreen()),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              child: InkWell(
-                onTap: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DebtScreen()),
-                ),
-                borderRadius: BorderRadius.circular(22),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              Icons.handshake_outlined,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DebtMetric(
-                              label: 'You owe',
-                              value: settings.hideBalance
-                                  ? '••••'
-                                  : MoneyFormatter.currency(debts.totalYouOwe),
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 38,
-                            color: Theme.of(context).dividerColor,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DebtMetric(
-                              label: 'Owed to you',
-                              value: settings.hideBalance
-                                  ? '••••'
-                                  : MoneyFormatter.currency(
-                                      debts.totalOwedToYou,
-                                    ),
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded),
-                        ],
-                      ),
-                      if (debts.openCount > 0) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              debts.overdueCount > 0
-                                  ? Icons.warning_amber_rounded
-                                  : Icons.pending_actions_outlined,
-                              size: 16,
-                              color: debts.overdueCount > 0
-                                  ? Theme.of(context).colorScheme.error
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                debts.overdueCount > 0
-                                    ? '${debts.openCount} open • ${debts.overdueCount} overdue'
-                                    : debts.dueSoonCount > 0
-                                    ? '${debts.openCount} open • ${debts.dueSoonCount} due soon'
-                                    : '${debts.openCount} open debt${debts.openCount == 1 ? '' : 's'}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+
             if (debts.nextAttentionDebt != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _DebtReminderCard(
                 item: debts.nextAttentionDebt!,
                 remaining: debts.remainingFor(debts.nextAttentionDebt!),
@@ -319,54 +209,40 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 22),
-            _SectionHeader(
-              title: 'This Month',
-              action: DateFormat('MMMM').format(DateTime.now()),
-            ),
-            const SizedBox(height: 10),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _Metric(
-                          label: 'Income',
-                          value: transactions.monthlyIncome,
-                        ),
-                        _divider(context),
-                        _Metric(
-                          label: 'Expense',
-                          value: transactions.monthlyExpense,
-                        ),
-                        _divider(context),
-                        _Metric(label: 'Net', value: monthlyNet),
-                      ],
+
+            const SizedBox(height: 20),
+
+            // Activity Feed Header
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$activeBookTitle Activity',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                TextButton(
+                  onPressed: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TransactionsScreen(),
+                    ),
+                  ),
+                  child: const Text('See all'),
+                ),
+              ],
             ),
-            const SizedBox(height: 22),
-            _SectionHeader(
-              title: 'Recent Transactions',
-              action: 'See all',
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (transactions.recentTransactions.isEmpty)
+            const SizedBox(height: 6),
+
+            // Activity List
+            if (bookTransactions.isEmpty)
               const _EmptyCard()
             else
-              ...transactions.recentTransactions
-                  .take(5)
-                  .map(
+              ...bookTransactions.take(8).map(
                     (item) => TransactionTile(
-                      title: item.note.isEmpty ? item.category : item.note,
+                      title: item.cleanNote.isEmpty ? item.category : item.cleanNote,
                       category: item.category,
                       amount: item.amount,
                       isIncome: item.isIncome,
@@ -378,45 +254,75 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  Widget _divider(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 42,
-      color: Theme.of(context).dividerColor,
-    );
-  }
 }
 
-class _ActionCard extends StatelessWidget {
+class _BookSelectorPill extends StatelessWidget {
   final String title;
-  final IconData icon;
-  final Color color;
+  final bool isCustomBook;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const _BookSelectorPill({
     required this.title,
-    required this.icon,
-    required this.color,
+    required this.isCustomBook,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: isCustomBook
+                ? scheme.primary.withValues(alpha: 0.12)
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isCustomBook
+                  ? scheme.primary.withValues(alpha: 0.4)
+                  : scheme.outlineVariant.withValues(alpha: 0.35),
+            ),
+          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(color: color, fontWeight: FontWeight.w800),
+              Icon(
+                isCustomBook
+                    ? Icons.folder_special_rounded
+                    : Icons.auto_stories_rounded,
+                size: 14,
+                color: scheme.primary,
+              ),
+              const SizedBox(width: 5),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 85),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: isCustomBook ? scheme.primary : scheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: scheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -426,117 +332,347 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String action;
-  final VoidCallback? onTap;
+class _BookHeroCard extends StatelessWidget {
+  final String monthLabel;
+  final int netBalance;
+  final int income;
+  final int expense;
+  final bool isHidden;
+  final VoidCallback onToggleVisibility;
+  final VoidCallback onCashIn;
+  final VoidCallback onCashOut;
 
-  const _SectionHeader({required this.title, required this.action, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-        ),
-        if (onTap != null)
-          TextButton(onPressed: onTap, child: Text(action))
-        else
-          Text(action, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  final String label;
-  final int value;
-
-  const _Metric({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        child: Column(
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 5),
-            FittedBox(
-              child: Text(
-                MoneyFormatter.currency(value),
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 40,
-              color: Theme.of(context).textTheme.bodySmall?.color,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'No transactions yet',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Use the + button to add your first transaction.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SavingsMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _SavingsMetric({
-    required this.label,
-    required this.value,
-    required this.color,
+  const _BookHeroCard({
+    required this.monthLabel,
+    required this.netBalance,
+    required this.income,
+    required this.expense,
+    required this.isHidden,
+    required this.onToggleVisibility,
+    required this.onCashIn,
+    required this.onCashOut,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 4),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+    final scheme = Theme.of(context).colorScheme;
+    final primary = scheme.primary;
+    final primaryDark = Color.lerp(primary, Colors.black, 0.35)!;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [primaryDark, primary],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primary.withValues(alpha: 0.20),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${monthLabel.toUpperCase()} NET',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: isHidden ? 'Show balance' : 'Hide balance',
+                onPressed: onToggleVisibility,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                style: IconButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                  padding: EdgeInsets.zero,
+                ),
+                icon: Icon(
+                  isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+
+          // Large Net Balance
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              isHidden ? '${MoneyFormatter.currencySymbol} ••••••' : MoneyFormatter.currency(netBalance),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.8,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Cash In / Cash Out Strip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.25),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.south_west_rounded,
+                          size: 12,
+                          color: Color(0xFF4ADE80),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Cash In',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              isHidden ? '••••' : MoneyFormatter.currency(income),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 28,
+                  color: Colors.white.withValues(alpha: 0.15),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.25),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.north_east_rounded,
+                          size: 12,
+                          color: Color(0xFFF87171),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Cash Out',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              isHidden ? '••••' : MoneyFormatter.currency(expense),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Built-in Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onCashIn,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(
+                    'Cash In',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: primaryDark,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCashOut,
+                  icon: const Icon(Icons.remove_rounded, size: 18),
+                  label: const Text(
+                    'Cash Out',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white60, width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlanceCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const _GlanceCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: color, size: 17),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -582,22 +718,20 @@ class _DebtReminderCard extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  overdue
-                      ? Icons.warning_amber_rounded
-                      : Icons.schedule_rounded,
+                  overdue ? Icons.warning_amber_rounded : Icons.schedule_rounded,
                   color: color,
                   size: 18,
                 ),
@@ -611,17 +745,16 @@ class _DebtReminderCard extends StatelessWidget {
                       '${_dueLabel()} • ${item.person}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       '${item.isYouOwe ? 'You owe' : 'Owed to you'} ${MoneyFormatter.currency(remaining)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, size: 20),
+              const Icon(Icons.chevron_right_rounded, size: 18),
             ],
           ),
         ),
@@ -630,33 +763,35 @@ class _DebtReminderCard extends StatelessWidget {
   }
 }
 
-class _DebtMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _DebtMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 4),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            style: TextStyle(color: color, fontWeight: FontWeight.w800),
-          ),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 44,
+              color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No transactions in this book',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap Cash In or Cash Out above to record an entry.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

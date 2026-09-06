@@ -15,6 +15,8 @@ class SettingsProvider extends ChangeNotifier {
   static const _materialColorKey = 'material_color';
   static const _currencySymbolKey = 'currency_symbol';
   static const _currencyCodeKey = 'currency_code';
+  static const _dailyReminderEnabledKey = 'daily_reminder_enabled';
+  static const _dailyReminderTimeKey = 'daily_reminder_time';
 
   ThemeMode _themeMode = ThemeMode.system;
   MaterialPalette _materialPalette = MaterialPalette.emerald;
@@ -22,6 +24,8 @@ class SettingsProvider extends ChangeNotifier {
   bool _hideBalance = false;
   String _currencySymbol = '৳';
   String _currencyCode = 'BDT';
+  bool _dailyReminderEnabled = false;
+  TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 21, minute: 0);
   bool _isLoaded = false;
 
   ThemeMode get themeMode => _themeMode;
@@ -31,6 +35,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get hideBalance => _hideBalance;
   String get currencySymbol => _currencySymbol;
   String get currencyCode => _currencyCode;
+  bool get dailyReminderEnabled => _dailyReminderEnabled;
+  TimeOfDay get dailyReminderTime => _dailyReminderTime;
   bool get isLoaded => _isLoaded;
 
   Future<void> loadTheme() async {
@@ -44,6 +50,8 @@ class SettingsProvider extends ChangeNotifier {
       final legacyMaterial = await _databaseService.getSetting('theme_accent');
       final savedCurrencySymbol = await _databaseService.getSetting(_currencySymbolKey);
       final savedCurrencyCode = await _databaseService.getSetting(_currencyCodeKey);
+      final savedReminderEnabled = await _databaseService.getSetting(_dailyReminderEnabledKey);
+      final savedReminderTime = await _databaseService.getSetting(_dailyReminderTimeKey);
 
       _themeMode = switch (savedTheme) {
         'light' => ThemeMode.light,
@@ -63,6 +71,18 @@ class SettingsProvider extends ChangeNotifier {
         _currencyCode = savedCurrencyCode;
       }
       MoneyFormatter.currencySymbol = _currencySymbol;
+
+      _dailyReminderEnabled = savedReminderEnabled == 'true';
+      if (savedReminderTime != null && savedReminderTime.contains(':')) {
+        final parts = savedReminderTime.split(':');
+        if (parts.length == 2) {
+          final h = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          if (h != null && m != null) {
+            _dailyReminderTime = TimeOfDay(hour: h, minute: m);
+          }
+        }
+      }
     } finally {
       _isLoaded = true;
       notifyListeners();
@@ -112,6 +132,22 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     await _databaseService.setSetting(_currencySymbolKey, symbol);
     await _databaseService.setSetting(_currencyCodeKey, code);
+  }
+
+  Future<void> setDailyReminderEnabled(bool value) async {
+    if (_dailyReminderEnabled == value) return;
+    _dailyReminderEnabled = value;
+    notifyListeners();
+    await _databaseService.setSetting(_dailyReminderEnabledKey, value.toString());
+  }
+
+  Future<void> setDailyReminderTime(TimeOfDay time) async {
+    _dailyReminderTime = time;
+    notifyListeners();
+    await _databaseService.setSetting(
+      _dailyReminderTimeKey,
+      '${time.hour}:${time.minute}',
+    );
   }
 
   Future<void> toggleBalanceVisibility() async {

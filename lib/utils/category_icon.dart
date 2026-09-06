@@ -7,6 +7,12 @@ class CategoryIcon {
     final name = category.toLowerCase();
 
     if (isIncome) {
+      if (name.contains('opening') ||
+          name.contains('brought') ||
+          name.contains('forward') ||
+          name.contains('rollover')) {
+        return Icons.account_balance_wallet_outlined;
+      }
       if (name.contains('salary')) return Icons.badge_outlined;
       if (name.contains('freelance')) return Icons.laptop_mac_outlined;
       if (name.contains('business')) return Icons.storefront_outlined;

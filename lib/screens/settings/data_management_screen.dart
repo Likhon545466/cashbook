@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/budget_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/savings_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -13,9 +14,12 @@ import '../../services/csv_import_service.dart';
 import '../../services/data_backup_service.dart';
 import '../../services/data_integrity_service.dart';
 import '../../services/database_service.dart';
+import '../../services/google_cloud_sync_service.dart';
 
 class DataManagementScreen extends StatefulWidget {
-  const DataManagementScreen({super.key});
+  const DataManagementScreen({super.key, this.databaseService});
+
+  final DatabaseService? databaseService;
 
   @override
   State<DataManagementScreen> createState() => _DataManagementScreenState();
@@ -35,9 +39,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _service = DataBackupService(DatabaseService.instance);
-    _integrityService = DataIntegrityService(DatabaseService.instance);
-    _csvService = CsvImportService(DatabaseService.instance);
+    final db = widget.databaseService ?? DatabaseService.instance;
+    _service = DataBackupService(db);
+    _integrityService = DataIntegrityService(db);
+    _csvService = CsvImportService(db);
     _refreshStats();
   }
 
@@ -1011,6 +1016,351 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     }
   }
 
+  Future<String?> _promptGoogleClientIdDialog({String? initialValue}) async {
+    final controller = TextEditingController(text: initialValue ?? '');
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(dialogContext).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.cloud_sync_rounded,
+                color: Theme.of(dialogContext).colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Google Drive Setup',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To connect your private Google Drive app storage, provide your Google Cloud OAuth 2.0 Web Client ID.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'OAuth Web Client ID',
+                  hintText: 'xxxx.apps.googleusercontent.com',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(dialogContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'How to get your Web Client ID:',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '1. Open Google Cloud Console\n'
+                      '2. APIs & Services ➔ Credentials\n'
+                      '3. Create OAuth 2.0 Client ID (Type: Web application)\n'
+                      '4. Copy the Client ID ending in .apps.googleusercontent.com',
+                      style: TextStyle(fontSize: 11, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid Client ID.')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, text);
+            },
+            child: const Text('Save & Connect'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _connectGoogle() async {
+    if (_busy) return;
+    final cloudSync = context.read<CloudSyncProvider>();
+
+    String? clientId = await cloudSync.getServerClientId();
+    if (clientId == null || clientId.isEmpty) {
+      clientId = await _promptGoogleClientIdDialog();
+      if (clientId == null || clientId.isEmpty) return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final success = await cloudSync.connectGoogleAccount(customServerClientId: clientId);
+      if (!mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Connected to Google Account (${cloudSync.currentUser?.email ?? ''})',
+            ),
+          ),
+        );
+      } else if (cloudSync.errorMessage != null) {
+        if (cloudSync.errorMessage!.contains('OAuth Web Client ID is required')) {
+          final newId = await _promptGoogleClientIdDialog(initialValue: clientId);
+          if (newId != null && newId.isNotEmpty && mounted) {
+            await cloudSync.connectGoogleAccount(customServerClientId: newId);
+          }
+        } else {
+          _showError('Google Connection', cloudSync.errorMessage!);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Google Connection', e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectGoogle() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Disconnect Google Account?'),
+        content: const Text(
+          'Automatic cloud backups to Google Drive will be paused. '
+          'Your existing cloud and local data will remain safe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!mounted || !confirmed) return;
+    final cloudSync = context.read<CloudSyncProvider>();
+    await cloudSync.disconnectGoogleAccount();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Google Account disconnected.')),
+    );
+  }
+
+  Future<void> _backupToCloud() async {
+    if (_busy) return;
+    final cloudSync = context.read<CloudSyncProvider>();
+    setState(() => _busy = true);
+    try {
+      final success = await cloudSync.backupToCloud(_service);
+      if (!mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cloud backup successfully saved to Google Drive!'),
+          ),
+        );
+      } else {
+        _showError('Cloud Backup', cloudSync.errorMessage ?? 'Upload failed');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Cloud Backup', e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restoreFromCloud() async {
+    if (_busy) return;
+    final cloudSync = context.read<CloudSyncProvider>();
+    setState(() => _busy = true);
+
+    CloudBackupMetadata? metadata;
+    try {
+      metadata = await cloudSync.fetchCloudMetadata();
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Fetch Cloud Backup', e);
+      setState(() => _busy = false);
+      return;
+    }
+
+    setState(() => _busy = false);
+    if (!mounted) return;
+
+    if (metadata == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No cloud backup found on your Google Drive.'),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(metadata!.modifiedTime);
+        final sizeKb = (metadata.sizeBytes / 1024).toStringAsFixed(1);
+        final count = metadata.transactionCount ?? 0;
+
+        return AlertDialog(
+          title: const Text('Restore from Google Drive?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Found the following cloud backup in your private Google Drive:',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(dialogContext).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(dialogContext).colorScheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Last Backup:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Text(dateStr, style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Transactions:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Text('$count entries', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Backup Size:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Text('$sizeKb KB', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Restoring will replace your current local transactions, categories, budgets, savings, and debt with this cloud backup.',
+                  style: TextStyle(fontSize: 12.5, color: Colors.redAccent),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Restore Cloud Data'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+
+    if (!mounted || !confirmed) return;
+
+    final transactionProvider = context.read<TransactionProvider>();
+    final categoryProvider = context.read<CategoryProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final savingsProvider = context.read<SavingsProvider>();
+    final debtProvider = context.read<DebtProvider>();
+    final budgetProvider = context.read<BudgetProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() => _busy = true);
+
+    try {
+      final success = await cloudSync.restoreFromCloud(_service);
+      if (!mounted) return;
+
+      if (success) {
+        await Future.wait([
+          transactionProvider.loadTransactions(),
+          categoryProvider.loadCategories(),
+          settingsProvider.loadTheme(),
+          savingsProvider.load(),
+          debtProvider.load(),
+          budgetProvider.loadCurrentMonth(),
+        ]);
+
+        await _refreshStats();
+
+        if (!mounted) return;
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Cloud backup restored successfully from Google Drive!'),
+          ),
+        );
+      } else {
+        _showError('Cloud Restore Failed', cloudSync.errorMessage ?? 'Restore failed');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Cloud Restore Failed', e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _showError(String prefix, Object error) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$prefix: ${_friendlyError(error)}')),
@@ -1024,6 +1374,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cloudSync = context.watch<CloudSyncProvider>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -1085,6 +1437,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 22),
+          const _SectionTitle('Google Drive Cloud Sync'),
+          const SizedBox(height: 10),
+          _buildGoogleCloudSyncCard(cloudSync),
           const SizedBox(height: 22),
           const _SectionTitle('Data Health'),
           const SizedBox(height: 10),
@@ -1220,6 +1576,248 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
             const LinearProgressIndicator(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildGoogleCloudSyncCard(CloudSyncProvider cloudSync) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    if (!cloudSync.isSignedIn) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.cloud_sync_rounded,
+                      color: scheme.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Google Drive Cloud Backup',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Private App Storage • Free Sync',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Connect your Google Account to back up your cashbook directly to your private Google Drive app storage. Easily restore your data across multiple devices.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _connectGoogle,
+                  icon: const Icon(Icons.account_circle_outlined),
+                  label: const Text('Connect Google Account'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final displayName = cloudSync.userDisplayName;
+    final email = cloudSync.userEmail;
+    final photoUrl = cloudSync.userPhotoUrl;
+    final meta = cloudSync.cloudMetadata;
+    final lastSync = cloudSync.lastSyncTime;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: scheme.primaryContainer,
+                  backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                      ? NetworkImage(photoUrl)
+                      : null,
+                  child: (photoUrl == null || photoUrl.isEmpty)
+                      ? Text(
+                          (displayName?.isNotEmpty == true
+                                  ? displayName![0]
+                                  : email?.isNotEmpty == true
+                                      ? email![0]
+                                      : 'G')
+                              .toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName ?? email ?? 'Google User',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        email ?? '',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Disconnect Account',
+                  icon: const Icon(Icons.link_off_rounded),
+                  onPressed: _busy ? null : _disconnectGoogle,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Automatic Cloud Backup',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              subtitle: const Text(
+                'Automatically sync data to Google Drive',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: cloudSync.autoSyncEnabled,
+              onChanged: _busy
+                  ? null
+                  : (val) => cloudSync.setAutoSyncEnabled(val),
+            ),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Last Cloud Sync:',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        lastSync != null
+                            ? DateFormat('dd MMM, hh:mm a').format(lastSync)
+                            : (meta?.modifiedTime != null
+                                ? DateFormat(
+                                    'dd MMM, hh:mm a',
+                                  ).format(meta!.modifiedTime)
+                                : 'Not synced yet'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  if (meta != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Cloud Records:',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${meta.transactionCount ?? 0} tx • ${(meta.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy || cloudSync.isSyncing
+                        ? null
+                        : _backupToCloud,
+                    icon: cloudSync.isSyncing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.cloud_upload_rounded, size: 19),
+                    label: const Text(
+                      'Backup Now',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy || cloudSync.isSyncing
+                        ? null
+                        : _restoreFromCloud,
+                    icon: const Icon(Icons.cloud_download_rounded, size: 19),
+                    label: const Text(
+                      'Restore Cloud',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/transaction_model.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../utils/amount_expression.dart';
 import '../../utils/category_icon.dart';
@@ -13,11 +14,13 @@ import '../../widgets/smart_amount_field.dart';
 class AddTransactionScreen extends StatefulWidget {
   final String initialType;
   final CashTransaction? transaction;
+  final DateTime? initialDate;
 
   const AddTransactionScreen({
     super.key,
     this.initialType = 'expense',
     this.transaction,
+    this.initialDate,
   });
 
   bool get isEditing => transaction != null;
@@ -55,9 +58,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _category = transaction.category;
       _date = transaction.date;
       _amountController.text = transaction.amount.toString();
-      _noteController.text = transaction.note;
+      _noteController.text = transaction.cleanNote;
     } else {
       _type = widget.initialType == 'income' ? 'income' : 'expense';
+      if (widget.initialDate != null) {
+        _date = widget.initialDate!;
+      }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _amountFocusNode.requestFocus();
@@ -87,13 +93,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final initialDate = _date.isAfter(now) ? now : _date;
+    final maxDate = DateTime(now.year + 5, 12, 31);
+    final initialDate = _date.isAfter(maxDate) ? maxDate : _date;
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: DateTime(2000),
-      lastDate: now,
+      lastDate: maxDate,
     );
 
     if (picked != null && mounted) {
@@ -321,13 +328,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     try {
       final provider = context.read<TransactionProvider>();
 
+      String finalNote = _noteController.text.trim();
+      if (widget.isEditing) {
+        final existingBook = widget.transaction?.customBook;
+        if (existingBook != null && !finalNote.contains('[Book: $existingBook]')) {
+          finalNote = finalNote.isEmpty
+              ? '[Book: $existingBook]'
+              : '$finalNote [Book: $existingBook]';
+        }
+      } else if (provider.isCustomBookSelected) {
+        final bookName = provider.selectedCustomBook!;
+        if (!finalNote.contains('[Book: $bookName]')) {
+          finalNote = finalNote.isEmpty
+              ? '[Book: $bookName]'
+              : '$finalNote [Book: $bookName]';
+        }
+      }
+
       final transaction = CashTransaction(
         id: widget.transaction?.id,
         type: _type,
         amount: amount,
         category: _category!,
         date: _date,
-        note: _noteController.text.trim(),
+        note: finalNote,
       );
 
       final success = widget.isEditing
@@ -337,6 +361,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!mounted) return;
 
       if (success) {
+        if (mounted) {
+          context.read<CloudSyncProvider>().scheduleAutoSync();
+        }
         await HapticFeedback.mediumImpact();
         if (!mounted) return;
 
@@ -496,6 +523,58 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
+                Builder(
+                  builder: (context) {
+                    final txProvider = context.watch<TransactionProvider>();
+                    final effectiveBook = widget.transaction?.customBook ??
+                        (txProvider.isCustomBookSelected
+                            ? txProvider.selectedCustomBook
+                            : null);
+
+                    if (effectiveBook == null) return const SizedBox.shrink();
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.22),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.folder_special_rounded,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Book: $effectiveBook',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 Row(
                   children: [
                     Expanded(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../widgets/month_picker_dialog.dart';
 import 'transaction_models.dart';
 
 class TransactionFilterSheet extends StatefulWidget {
@@ -133,6 +134,23 @@ class _TransactionFilterSheetState extends State<TransactionFilterSheet> {
                     selected: _tempDate == option,
                     onSelected: () => setState(() => _tempDate = option),
                   ),
+                VisibleChoiceChip(
+                  label: 'Pick Month',
+                  selected: false,
+                  onSelected: () async {
+                    final picked = await MonthPickerDialog.show(
+                      context,
+                      initialMonth: _tempRange?.start ?? DateTime.now(),
+                    );
+                    if (picked == null) return;
+                    final start = DateTime(picked.year, picked.month, 1);
+                    final lastDay = DateTime(picked.year, picked.month + 1, 0);
+                    setState(() {
+                      _tempRange = DateTimeRange(start: start, end: lastDay);
+                      _tempDate = DateFilter.custom;
+                    });
+                  },
+                ),
                 VisibleChoiceChip(
                   label: _tempRange == null
                       ? 'Custom Range'

@@ -31,10 +31,16 @@ class CashDetailSheet extends StatelessWidget {
               color: color,
               amount:
                   '${item.isIncome ? '+' : '-'}${MoneyFormatter.currency(item.amount)}',
-              title: item.note.isEmpty ? item.category : item.note,
+              title: item.cleanNote.isEmpty ? item.category : item.cleanNote,
               badge: item.isIncome ? 'Cash In' : 'Cash Out',
             ),
             const SizedBox(height: 18),
+            if (item.customBook != null)
+              DetailRow(
+                icon: Icons.folder_special_outlined,
+                label: 'Book',
+                value: item.customBook!,
+              ),
             DetailRow(
               icon: Icons.category_outlined,
               label: 'Category',
@@ -45,11 +51,11 @@ class CashDetailSheet extends StatelessWidget {
               label: 'Date',
               value: DateFormat('dd MMMM yyyy').format(item.date),
             ),
-            if (item.note.isNotEmpty)
+            if (item.cleanNote.isNotEmpty)
               DetailRow(
                 icon: Icons.notes_rounded,
                 label: 'Note',
-                value: item.note,
+                value: item.cleanNote,
               ),
             const SizedBox(height: 18),
             Row(

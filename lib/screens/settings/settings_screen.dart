@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/security_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../transactions/recurring_transactions_screen.dart';
 import 'appearance_screen.dart';
 import 'budget_screen.dart';
 import 'category_management_screen.dart';
@@ -33,6 +35,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final security = context.watch<SecurityProvider>();
     final settings = context.watch<SettingsProvider>();
+    final cloudSync = context.watch<CloudSyncProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -96,6 +99,140 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
+          const _SectionLabel('Reminders & Alerts'),
+          const SizedBox(height: 8),
+          _CardGroup(
+            children: [
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                secondary: const _SettingsIcon(icon: Icons.notifications_active_outlined),
+                title: const Text(
+                  'Daily Expense Reminder',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  settings.dailyReminderEnabled
+                      ? 'Remind daily at ${settings.dailyReminderTime.format(context)}'
+                      : 'Get prompted if you haven\'t logged expenses today',
+                ),
+                value: settings.dailyReminderEnabled,
+                onChanged: (val) => settings.setDailyReminderEnabled(val),
+              ),
+              if (settings.dailyReminderEnabled) ...[
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  leading: const _SettingsIcon(icon: Icons.schedule_rounded),
+                  title: const Text(
+                    'Reminder Time',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text('Tap to change time'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      settings.dailyReminderTime.format(context),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: settings.dailyReminderTime,
+                    );
+                    if (picked != null) {
+                      await settings.setDailyReminderTime(picked);
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          const _SectionLabel('Cloud & Sync'),
+          const SizedBox(height: 8),
+          _CardGroup(
+            children: [
+              if (cloudSync.isSignedIn)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    backgroundImage:
+                        cloudSync.userPhotoUrl != null && cloudSync.userPhotoUrl!.isNotEmpty
+                            ? NetworkImage(cloudSync.userPhotoUrl!)
+                            : null,
+                    child: (cloudSync.userPhotoUrl == null || cloudSync.userPhotoUrl!.isEmpty)
+                        ? Text(
+                            (cloudSync.userDisplayName?.isNotEmpty == true
+                                    ? cloudSync.userDisplayName![0]
+                                    : cloudSync.userEmail?.isNotEmpty == true
+                                    ? cloudSync.userEmail![0]
+                                    : 'G')
+                                .toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
+                  title: Text(
+                    cloudSync.userDisplayName ??
+                        cloudSync.userEmail ??
+                        'Google Account',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    cloudSync.isSyncing
+                        ? 'Syncing with Google Drive...'
+                        : cloudSync.autoSyncEnabled
+                        ? 'Auto-Sync enabled • Google Drive'
+                        : 'Connected to Google Drive',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DataManagementScreen(),
+                    ),
+                  ),
+                )
+              else
+                _Tile(
+                  icon: Icons.cloud_sync_outlined,
+                  title: 'Google Cloud Sync',
+                  subtitle: 'Connect Google Drive for auto-backup & restore',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DataManagementScreen(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
           const _SectionLabel('Money'),
           const SizedBox(height: 8),
           _CardGroup(
@@ -125,30 +262,24 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(height: 1),
               _Tile(
+                icon: Icons.autorenew_rounded,
+                title: 'Recurring & Fixed',
+                subtitle: 'Automate rent, bills, salary & subscriptions',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RecurringTransactionsScreen(),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              _Tile(
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'Monthly Budgets',
                 subtitle: 'Plan limits and track spending',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const BudgetScreen()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const _SectionLabel('Data'),
-          const SizedBox(height: 8),
-          _CardGroup(
-            children: [
-              _Tile(
-                icon: Icons.shield_outlined,
-                title: 'Data & Backup',
-                subtitle: 'Backup, restore, export and clear data',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DataManagementScreen(),
-                  ),
                 ),
               ),
             ],

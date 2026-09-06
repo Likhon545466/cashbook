@@ -6,6 +6,7 @@ import '../models/category_model.dart';
 import '../models/debt_model.dart';
 import '../models/debt_due_extension_model.dart';
 import '../models/debt_payment_model.dart';
+import '../models/recurring_transaction_model.dart';
 import '../models/transaction_model.dart';
 import '../models/savings_transfer_model.dart';
 
@@ -16,7 +17,10 @@ class DatabaseService {
   Database? _database;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    if (_database != null) {
+      await _createRecurringTransactionsTable(_database!);
+      return _database!;
+    }
 
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'cashbook.db');
@@ -36,6 +40,7 @@ class DatabaseService {
         await _createDebtsTable(db);
         await _createDebtPaymentsTable(db);
         await _createDebtDueExtensionsTable(db);
+        await _createRecurringTransactionsTable(db);
         await _seedDefaultCategories(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -179,8 +184,31 @@ class DatabaseService {
     ''');
   }
 
+  Future<void> _createRecurringTransactionsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS recurring_transactions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        dayOfMonth INTEGER NOT NULL DEFAULT 1,
+        customBook TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        lastAppliedMonth TEXT,
+        isActive INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+  }
+
   Future<void> _seedDefaultCategories(Database db) async {
-    const income = ['Salary', 'Freelance', 'Business', 'Other Income'];
+    const income = [
+      'Salary',
+      'Freelance',
+      'Business',
+      'Opening Balance',
+      'Other Income',
+    ];
     const expense = [
       'Food',
       'Transport',
@@ -625,6 +653,42 @@ class DatabaseService {
     });
   }
 
+  Future<List<RecurringTransaction>> getRecurringTransactions() async {
+    final db = await database;
+    final rows = await db.query(
+      'recurring_transactions',
+      orderBy: 'dayOfMonth ASC, id DESC',
+    );
+    return rows.map(RecurringTransaction.fromMap).toList();
+  }
+
+  Future<int> insertRecurringTransaction(RecurringTransaction item) async {
+    final db = await database;
+    final data = item.toMap()..remove('id');
+    return db.insert('recurring_transactions', data);
+  }
+
+  Future<int> updateRecurringTransaction(RecurringTransaction item) async {
+    if (item.id == null) return 0;
+    final db = await database;
+    final data = item.toMap()..remove('id');
+    return db.update(
+      'recurring_transactions',
+      data,
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  Future<int> deleteRecurringTransaction(int id) async {
+    final db = await database;
+    return db.delete(
+      'recurring_transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> clearUserData() async {
     final db = await database;
 
@@ -636,6 +700,7 @@ class DatabaseService {
       await txn.delete('debt_due_extensions');
       await txn.delete('debt_payments');
       await txn.delete('debts');
+      await txn.delete('recurring_transactions');
     });
   }
 }

@@ -5,14 +5,17 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../models/debt_model.dart';
 import '../../models/debt_payment_model.dart';
 import '../../models/savings_transfer_model.dart';
 import '../../models/transaction_model.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/savings_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/statement_export_service.dart';
 import '../../widgets/savings_transfer_sheet.dart';
 import '../../widgets/transaction_tile.dart';
 import '../debt/debt_screen.dart';
@@ -40,6 +43,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   String? _categoryFilter;
   DateTimeRange? _customRange;
   bool _searchOpen = false;
+  bool _onlyActiveBook = false;
 
   int get _activeFilterCount {
     var count = 0;
@@ -47,6 +51,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     if (_dateFilter != DateFilter.all) count++;
     if (_sort != TransactionSort.newest) count++;
     if (_categoryFilter != null) count++;
+    if (_onlyActiveBook) count++;
     return count;
   }
 
@@ -149,6 +154,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       ),
     );
 
+    if (success && mounted) {
+      context.read<CloudSyncProvider>().scheduleAutoSync();
+    }
+
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -219,9 +228,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           builder: (dialogContext) => AlertDialog(
             title: const Text('Delete transaction?'),
             content: Text(
-              item.note.isEmpty
+              item.cleanNote.isEmpty
                   ? 'Delete this ${item.category} transaction?'
-                  : 'Delete "${item.note}"?',
+                  : 'Delete "${item.cleanNote}"?',
             ),
             actions: [
               TextButton(
@@ -258,6 +267,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       return;
     }
 
+    if (mounted) {
+      context.read<CloudSyncProvider>().scheduleAutoSync();
+    }
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -268,11 +281,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             label: 'Undo',
             onPressed: () async {
               final restored = await provider.restoreTransaction(item);
-              if (!mounted || restored) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not restore transaction.')),
-              );
+              if (!mounted) return;
+              if (restored) {
+                context.read<CloudSyncProvider>().scheduleAutoSync();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not restore transaction.')),
+                );
+              }
             },
           ),
         ),
@@ -442,6 +458,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       _sort = TransactionSort.newest;
       _categoryFilter = null;
       _customRange = null;
+      _onlyActiveBook = false;
     });
   }
 
@@ -456,6 +473,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         categoryProvider.categories.map((item) => item.name).toSet().toList()
           ..sort();
 
+    final currentBookIds = transactions.currentBookTransactions
+        .map((t) => t.id)
+        .whereType<int>()
+        .toSet();
+
     final activities = _sortItems(
       _buildActivities(
             transactions.transactions,
@@ -467,6 +489,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           .where(_matchesDate)
           .where(_matchesCategory)
           .where(_matchesQuery)
+          .where((item) {
+            if (!_onlyActiveBook) return true;
+            if (item.cash != null) {
+              return currentBookIds.contains(item.cash!.id);
+            }
+            return false;
+          })
           .toList(),
     );
 
@@ -475,6 +504,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         transactions.transactions.isNotEmpty ||
         savings.items.isNotEmpty ||
         debts.items.isNotEmpty;
+
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -494,6 +526,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Export Statement',
+            onPressed: () {
+              final bookTransactions = transactions.currentBookTransactions;
+              StatementExportService.showExportSheet(
+                context,
+                bookTitle: transactions.activeBookTitle,
+                transactions: bookTransactions,
+                totalIncome: transactions.currentBookIncome,
+                totalExpense: transactions.currentBookExpense,
+              );
+            },
+            icon: const Icon(Icons.file_download_outlined),
+          ),
           IconButton(
             tooltip: _searchOpen ? 'Close search' : 'Search',
             onPressed: () {
@@ -547,6 +593,73 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   : const SizedBox.shrink(key: ValueKey('no-search')),
             ),
             if (_searchOpen) const SizedBox(height: 10),
+
+            // Quick Filter Chips Bar
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _QuickFilterChip(
+                    label: 'All',
+                    selected:
+                        _typeFilter == TransactionTypeFilter.all &&
+                        !_onlyActiveBook,
+                    onTap: () {
+                      setState(() {
+                        _typeFilter = TransactionTypeFilter.all;
+                        _onlyActiveBook = false;
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _QuickFilterChip(
+                    label: 'Income',
+                    icon: Icons.arrow_downward_rounded,
+                    semanticColor: AppSemanticColors.income(context),
+                    selected: _typeFilter == TransactionTypeFilter.income,
+                    onTap: () {
+                      setState(() {
+                        _typeFilter =
+                            _typeFilter == TransactionTypeFilter.income
+                            ? TransactionTypeFilter.all
+                            : TransactionTypeFilter.income;
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _QuickFilterChip(
+                    label: 'Expense',
+                    icon: Icons.arrow_upward_rounded,
+                    semanticColor: AppSemanticColors.expense(context),
+                    selected: _typeFilter == TransactionTypeFilter.expense,
+                    onTap: () {
+                      setState(() {
+                        _typeFilter =
+                            _typeFilter == TransactionTypeFilter.expense
+                            ? TransactionTypeFilter.all
+                            : TransactionTypeFilter.expense;
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _QuickFilterChip(
+                    label: transactions.activeBookTitle,
+                    icon: transactions.selectedCustomBook == null
+                        ? Icons.calendar_month_rounded
+                        : Icons.auto_stories_rounded,
+                    semanticColor: scheme.primary,
+                    selected: _onlyActiveBook,
+                    onTap: () {
+                      setState(() {
+                        _onlyActiveBook = !_onlyActiveBook;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
             Row(
               children: [
                 Expanded(
@@ -681,5 +794,107 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }
 
     return widgets;
+  }
+}
+
+class _QuickFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Color? semanticColor;
+
+  const _QuickFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.semanticColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final baseColor = semanticColor ?? scheme.primary;
+
+    final Color backgroundColor;
+    final Color borderColor;
+    final Color foregroundColor;
+
+    if (selected) {
+      backgroundColor = baseColor;
+      borderColor = baseColor;
+      foregroundColor =
+          baseColor == scheme.primary ? scheme.onPrimary : Colors.white;
+    } else {
+      if (semanticColor != null) {
+        backgroundColor = semanticColor!.withValues(alpha: isDark ? 0.14 : 0.08);
+        borderColor = semanticColor!.withValues(alpha: isDark ? 0.32 : 0.22);
+        foregroundColor = semanticColor!;
+      } else {
+        backgroundColor = isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.04);
+        borderColor = isDark
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08);
+        foregroundColor = scheme.onSurfaceVariant;
+      }
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7.5),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor, width: 1.1),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: baseColor.withValues(alpha: isDark ? 0.35 : 0.20),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 14,
+                  color: foregroundColor,
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: foregroundColor,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  fontSize: 12.5,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

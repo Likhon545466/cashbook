@@ -17,6 +17,15 @@ class CashTransaction {
 
   bool get isIncome => type == 'income';
 
+  String? get customBook {
+    final match = RegExp(r'\[Book:\s*([^\]]+)\]').firstMatch(note);
+    return match?.group(1)?.trim();
+  }
+
+  String get cleanNote {
+    return note.replaceAll(RegExp(r'\s*\[Book:\s*[^\]]+\]'), '').trim();
+  }
+
   Map<String, Object?> toMap() {
     return {
       'id': id,

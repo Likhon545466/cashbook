@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_colors.dart';
+import '../providers/cloud_sync_provider.dart';
+import '../providers/recurring_provider.dart';
 import '../providers/savings_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../screens/debt/debt_screen.dart';
@@ -10,7 +12,9 @@ import '../screens/home/home_screen.dart';
 import '../screens/reports/reports_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/transactions/add_transaction_screen.dart';
+import '../screens/transactions/recurring_transactions_screen.dart';
 import '../screens/transactions/transactions_screen.dart';
+import '../services/notification_service.dart';
 import '../widgets/savings_transfer_sheet.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -20,8 +24,75 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      context
+          .read<CloudSyncProvider>()
+          .scheduleAutoSync(delay: const Duration(seconds: 3));
+
+      NotificationService.checkDailyReminder(context);
+
+      final recurring = context.read<RecurringProvider>();
+      await recurring.load();
+      if (!mounted) return;
+      final due = recurring.dueItems;
+      if (due.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Row(
+              children: [
+                const Icon(Icons.autorenew_rounded, color: Colors.cyanAccent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${due.length} recurring ${due.length == 1 ? 'item is' : 'items are'} due this month.',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'Review',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RecurringTransactionsScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context
+          .read<CloudSyncProvider>()
+          .scheduleAutoSync(delay: const Duration(seconds: 2));
+      NotificationService.checkDailyReminder(context);
+    }
+  }
 
   final _screens = const [
     HomeScreen(),
@@ -110,11 +181,24 @@ class _MainNavigationState extends State<MainNavigation> {
     }
 
     final type = action == _QuickAction.cashIn ? 'income' : 'expense';
+    final transactions = context.read<TransactionProvider>();
+    final initialDate = transactions.isCurrentMonthSelected
+        ? DateTime.now()
+        : DateTime(
+            transactions.selectedMonth.year,
+            transactions.selectedMonth.month,
+            1,
+            12,
+            0,
+          );
 
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => AddTransactionScreen(initialType: type),
+        builder: (_) => AddTransactionScreen(
+          initialType: type,
+          initialDate: initialDate,
+        ),
       ),
     );
 

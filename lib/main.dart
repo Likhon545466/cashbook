@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'providers/budget_provider.dart';
 import 'providers/category_provider.dart';
+import 'providers/cloud_sync_provider.dart';
 import 'providers/debt_provider.dart';
+import 'providers/recurring_provider.dart';
 import 'providers/security_provider.dart';
 import 'providers/savings_provider.dart';
 import 'providers/settings_provider.dart';
@@ -43,6 +45,13 @@ void main() {
         ),
         ChangeNotifierProvider(
           create: (_) => DebtProvider(DatabaseService.instance)..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => RecurringProvider(DatabaseService.instance)..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CloudSyncProvider(DatabaseService.instance)..init(),
         ),
       ],
       child: const CashBookApp(),
