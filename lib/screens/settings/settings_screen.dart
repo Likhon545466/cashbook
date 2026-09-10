@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/app_info.dart';
 import '../../providers/cloud_sync_provider.dart';
 import '../../providers/security_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../transactions/recurring_transactions_screen.dart';
+import 'about_screen.dart';
 import 'appearance_screen.dart';
 import 'budget_screen.dart';
 import 'category_management_screen.dart';
@@ -287,16 +289,18 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 20),
           const _SectionLabel('About'),
           const SizedBox(height: 8),
-          const Card(
-            child: ListTile(
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              leading: _SettingsIcon(icon: Icons.info_outline_rounded),
-              title: Text(
-                'CashBook',
-                style: TextStyle(fontWeight: FontWeight.w700),
+          _CardGroup(
+            children: [
+              _Tile(
+                icon: Icons.info_outline_rounded,
+                title: 'About CashBook',
+                subtitle: '${AppInfo.fullVersion} • Changelog, GitHub & Updates',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutScreen()),
+                ),
               ),
-              subtitle: Text('Offline personal cash tracking'),
-            ),
+            ],
           ),
         ],
       ),

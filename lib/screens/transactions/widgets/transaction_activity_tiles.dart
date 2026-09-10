@@ -77,7 +77,7 @@ class SavingsActivityTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    DateFormat('dd MMM').format(item.date),
+                    DateFormat('dd MMM, hh:mm a').format(item.date),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -161,7 +161,7 @@ class DebtActivityTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    DateFormat('dd MMM').format(activity.date),
+                    DateFormat('dd MMM, hh:mm a').format(activity.date),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

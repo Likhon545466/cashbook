@@ -760,11 +760,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             },
             onDismissed: (_) => _deleteWithUndo(provider, item),
             child: TransactionTile(
-              title: item.note.isEmpty ? item.category : item.note,
+              title: item.cleanNote.isEmpty ? item.category : item.cleanNote,
               category: item.category,
               amount: item.amount,
               isIncome: item.isIncome,
-              dateLabel: DateFormat('dd MMM').format(item.date),
+              dateLabel: DateFormat('dd MMM, hh:mm a').format(item.date),
               onTap: () => _showCashDetails(provider, item),
             ),
           ),

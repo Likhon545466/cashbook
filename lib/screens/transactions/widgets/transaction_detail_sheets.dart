@@ -51,6 +51,11 @@ class CashDetailSheet extends StatelessWidget {
               label: 'Date',
               value: DateFormat('dd MMMM yyyy').format(item.date),
             ),
+            DetailRow(
+              icon: Icons.schedule_rounded,
+              label: 'Time',
+              value: DateFormat('hh:mm a').format(item.date),
+            ),
             if (item.cleanNote.isNotEmpty)
               DetailRow(
                 icon: Icons.notes_rounded,
@@ -140,9 +145,14 @@ class SavingsDetailSheet extends StatelessWidget {
                   : 'Savings → Available',
             ),
             DetailRow(
-              icon: Icons.schedule_rounded,
+              icon: Icons.calendar_today_outlined,
               label: 'Date',
-              value: DateFormat('dd MMM yyyy, hh:mm a').format(item.date),
+              value: DateFormat('dd MMMM yyyy').format(item.date),
+            ),
+            DetailRow(
+              icon: Icons.schedule_rounded,
+              label: 'Time',
+              value: DateFormat('hh:mm a').format(item.date),
             ),
             if (item.note.isNotEmpty)
               DetailRow(

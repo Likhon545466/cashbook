@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/debt_model.dart';
+import '../../models/transaction_model.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/savings_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -16,6 +18,8 @@ import '../debt/debt_screen.dart';
 import '../savings/savings_screen.dart';
 import '../transactions/add_transaction_screen.dart';
 import '../transactions/transactions_screen.dart';
+import '../transactions/widgets/transaction_detail_sheets.dart';
+import '../transactions/widgets/transaction_models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,6 +72,160 @@ class _HomeScreenState extends State<HomeScreen> {
         content: Text(type == 'income' ? 'Cash in saved.' : 'Cash out saved.'),
       ),
     );
+  }
+
+  Future<void> _editTransaction(CashTransaction item) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(transaction: item),
+      ),
+    );
+
+    if (!mounted || updated != true) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction updated.')),
+    );
+  }
+
+  Future<void> _duplicateTransaction(
+    TransactionProvider provider,
+    CashTransaction item,
+  ) async {
+    await HapticFeedback.mediumImpact();
+
+    final success = await provider.addTransaction(
+      CashTransaction(
+        type: item.type,
+        amount: item.amount,
+        category: item.category,
+        date: DateTime.now(),
+        note: item.note,
+      ),
+    );
+
+    if (success && mounted) {
+      context.read<CloudSyncProvider>().scheduleAutoSync();
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Transaction duplicated.'
+              : provider.errorMessage ?? 'Could not duplicate transaction.',
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete(CashTransaction item) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Delete transaction?'),
+            content: Text(
+              item.cleanNote.isEmpty
+                  ? 'Delete this ${item.category} transaction?'
+                  : 'Delete "${item.cleanNote}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _deleteWithUndo(
+    TransactionProvider provider,
+    CashTransaction item,
+  ) async {
+    if (item.id == null) return;
+
+    final deleted = await provider.deleteTransaction(item.id!);
+    if (!mounted) return;
+
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage ?? 'Could not delete transaction.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      context.read<CloudSyncProvider>().scheduleAutoSync();
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Transaction deleted.'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              final restored = await provider.restoreTransaction(item);
+              if (!mounted) return;
+              if (restored) {
+                context.read<CloudSyncProvider>().scheduleAutoSync();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not restore transaction.')),
+                );
+              }
+            },
+          ),
+        ),
+      );
+  }
+
+  Future<void> _showCashDetails(
+    TransactionProvider provider,
+    CashTransaction item,
+  ) async {
+    await HapticFeedback.selectionClick();
+    if (!mounted) return;
+
+    final action = await showModalBottomSheet<CashAction>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => CashDetailSheet(item: item),
+    );
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case CashAction.edit:
+        await _editTransaction(item);
+        break;
+      case CashAction.duplicate:
+        await _duplicateTransaction(provider, item);
+        break;
+      case CashAction.delete:
+        final confirmed = await _confirmDelete(item);
+        if (confirmed && mounted) {
+          await HapticFeedback.mediumImpact();
+          await _deleteWithUndo(provider, item);
+        }
+        break;
+    }
   }
 
   Future<void> _pickBookMonth() async {
@@ -246,7 +404,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       category: item.category,
                       amount: item.amount,
                       isIncome: item.isIncome,
-                      dateLabel: DateFormat('dd MMM').format(item.date),
+                      dateLabel: DateFormat('dd MMM, hh:mm a').format(item.date),
+                      onTap: () => _showCashDetails(transactions, item),
                     ),
                   ),
           ],

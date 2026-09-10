@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -104,20 +105,67 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
 
     if (picked != null && mounted) {
-      HapticFeedback.selectionClick();
-      setState(() => _date = picked);
+      await HapticFeedback.selectionClick();
+      setState(() {
+        _date = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _date.hour,
+          _date.minute,
+          _date.second,
+        );
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_date),
+    );
+
+    if (picked != null && mounted) {
+      await HapticFeedback.selectionClick();
+      setState(() {
+        _date = DateTime(
+          _date.year,
+          _date.month,
+          _date.day,
+          picked.hour,
+          picked.minute,
+        );
+      });
     }
   }
 
   void _setToday() {
     HapticFeedback.selectionClick();
-    setState(() => _date = DateTime.now());
+    final now = DateTime.now();
+    setState(() {
+      _date = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        _date.hour,
+        _date.minute,
+        _date.second,
+      );
+    });
   }
 
   void _setYesterday() {
     HapticFeedback.selectionClick();
+    final yest = DateTime.now().subtract(const Duration(days: 1));
     setState(() {
-      _date = DateTime.now().subtract(const Duration(days: 1));
+      _date = DateTime(
+        yest.year,
+        yest.month,
+        yest.day,
+        _date.hour,
+        _date.minute,
+        _date.second,
+      );
     });
   }
 
@@ -811,7 +859,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     ],
                   ),
                 const SizedBox(height: 22),
-                const _LabelRow(title: 'Date'),
+                const _LabelRow(title: 'Date & Time'),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -838,6 +886,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       tooltip: 'Choose date',
                       onPressed: _pickDate,
                       icon: const Icon(Icons.calendar_month_outlined),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _ActionPill(
+                        icon: Icons.calendar_today_outlined,
+                        label: DateFormat('EEE, dd MMM yyyy').format(_date),
+                        onTap: _pickDate,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: _ActionPill(
+                        icon: Icons.schedule_rounded,
+                        label: DateFormat('hh:mm a').format(_date),
+                        onTap: _pickTime,
+                      ),
                     ),
                   ],
                 ),
@@ -1002,6 +1072,60 @@ class _LabelRow extends StatelessWidget {
         const Spacer(),
         ?trailing,
       ],
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionPill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: theme.dividerColor,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
