@@ -15,7 +15,7 @@ import 'providers/settings_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'services/database_service.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppInfo.init();
 
