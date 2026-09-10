@@ -57,15 +57,15 @@ class _AboutScreenState extends State<AboutScreen> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open $url')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open $url')));
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open link.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link.')));
       }
     }
   }
@@ -74,7 +74,8 @@ class _AboutScreenState extends State<AboutScreen> {
     await HapticFeedback.selectionClick();
     await SharePlus.instance.share(
       ShareParams(
-        text: 'Check out CashBook - a fast, offline-first personal finance app: ${AppInfo.githubRepoUrl}',
+        text:
+            'Check out CashBook - a fast, offline-first personal finance app: ${AppInfo.githubRepoUrl}',
         subject: 'CashBook App',
       ),
     );
@@ -137,9 +138,7 @@ class _AboutScreenState extends State<AboutScreen> {
       color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -150,10 +149,7 @@ class _AboutScreenState extends State<AboutScreen> {
               height: 72,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    scheme.primary,
-                    scheme.secondary,
-                  ],
+                  colors: [scheme.primary, scheme.secondary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -240,27 +236,31 @@ class _AboutScreenState extends State<AboutScreen> {
                     color: _isChecking
                         ? scheme.primary.withValues(alpha: 0.1)
                         : (isUpdateAvailable
-                            ? AppSemanticColors.savings(context).withValues(alpha: 0.15)
-                            : (isSuccess
-                                ? AppSemanticColors.income(context).withValues(alpha: 0.12)
-                                : scheme.error.withValues(alpha: 0.12))),
+                              ? AppSemanticColors.savings(
+                                  context,
+                                ).withValues(alpha: 0.15)
+                              : (isSuccess
+                                    ? AppSemanticColors.income(
+                                        context,
+                                      ).withValues(alpha: 0.12)
+                                    : scheme.error.withValues(alpha: 0.12))),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     _isChecking
                         ? Icons.sync_rounded
                         : (isUpdateAvailable
-                            ? Icons.system_update_rounded
-                            : (isSuccess
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.cloud_off_rounded)),
+                              ? Icons.system_update_rounded
+                              : (isSuccess
+                                    ? Icons.check_circle_outline_rounded
+                                    : Icons.cloud_off_rounded)),
                     color: _isChecking
                         ? scheme.primary
                         : (isUpdateAvailable
-                            ? AppSemanticColors.savings(context)
-                            : (isSuccess
-                                ? AppSemanticColors.income(context)
-                                : scheme.error)),
+                              ? AppSemanticColors.savings(context)
+                              : (isSuccess
+                                    ? AppSemanticColors.income(context)
+                                    : scheme.error)),
                     size: 20,
                   ),
                 ),
@@ -273,10 +273,10 @@ class _AboutScreenState extends State<AboutScreen> {
                         _isChecking
                             ? 'Checking for updates...'
                             : (isUpdateAvailable
-                                ? 'Update Available: ${result.latestVersion}'
-                                : (isSuccess
-                                    ? 'You\'re on the latest version'
-                                    : 'Update check failed')),
+                                  ? 'Update Available: ${result.latestVersion}'
+                                  : (isSuccess
+                                        ? 'You\'re on the latest version'
+                                        : 'Update check failed')),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
@@ -307,7 +307,9 @@ class _AboutScreenState extends State<AboutScreen> {
               ],
             ),
 
-            if (isUpdateAvailable && result.releaseNotes != null && result.releaseNotes!.isNotEmpty) ...[
+            if (isUpdateAvailable &&
+                result.releaseNotes != null &&
+                result.releaseNotes!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -347,7 +349,8 @@ class _AboutScreenState extends State<AboutScreen> {
                     ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
-                    onPressed: () => _openUrl(result.htmlUrl ?? AppInfo.githubReleasesUrl),
+                    onPressed: () =>
+                        _openUrl(result.htmlUrl ?? AppInfo.githubReleasesUrl),
                     icon: const Icon(Icons.open_in_new_rounded, size: 16),
                     label: const Text('View Release'),
                   ),
@@ -393,14 +396,15 @@ class _AboutScreenState extends State<AboutScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: Container(
               width: 42,
               height: 42,
@@ -420,7 +424,10 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           const Divider(height: 1),
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: Container(
               width: 42,
               height: 42,
@@ -440,7 +447,10 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           const Divider(height: 1),
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: Container(
               width: 42,
               height: 42,
@@ -485,7 +495,10 @@ class _AboutScreenState extends State<AboutScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: entry.isLatest
                             ? scheme.primary
@@ -506,9 +519,14 @@ class _AboutScreenState extends State<AboutScreen> {
                     if (entry.isLatest) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: AppSemanticColors.savings(context).withValues(alpha: 0.15),
+                          color: AppSemanticColors.savings(
+                            context,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -585,11 +603,7 @@ class _AboutScreenState extends State<AboutScreen> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.shield_outlined,
-            color: scheme.primary,
-            size: 24,
-          ),
+          Icon(Icons.shield_outlined, color: scheme.primary, size: 24),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -622,9 +636,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }

@@ -52,8 +52,7 @@ void main() async {
           create: (_) => RecurringProvider(DatabaseService.instance)..load(),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              CloudSyncProvider(DatabaseService.instance)..init(),
+          create: (_) => CloudSyncProvider(DatabaseService.instance)..init(),
         ),
       ],
       child: const CashBookApp(),
