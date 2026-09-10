@@ -35,6 +35,7 @@ class _AboutScreenState extends State<AboutScreen> {
       _updateResult = null;
     });
 
+    await AppInfo.init();
     final result = await _updateService.checkForUpdates();
 
     if (!mounted) return;

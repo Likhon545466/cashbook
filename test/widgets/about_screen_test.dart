@@ -32,7 +32,7 @@ void main() {
         scrollable: find.byType(Scrollable),
       );
       expect(find.text('Version History & Changelog'), findsOneWidget);
-      expect(find.text('v1.7.5'), findsOneWidget);
+      expect(find.text(AppInfo.changelog.first.version), findsOneWidget);
       expect(find.text('Time Display & About Hub'), findsOneWidget);
       expect(find.text('Latest'), findsOneWidget);
 

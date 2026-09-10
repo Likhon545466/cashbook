@@ -132,7 +132,7 @@ class AppUpdateService {
     }
 
     if (response.statusCode == 404) {
-      return const UpdateCheckResult(
+      return UpdateCheckResult(
         hasUpdate: false,
         latestVersion: AppInfo.currentVersion,
         releaseNotes: 'You are using the latest version of CashBook.',
@@ -149,7 +149,7 @@ class AppUpdateService {
   UpdateCheckResult _parseAtomFeed(String xmlString) {
     final entryMatch = RegExp(r'<entry>([\s\S]*?)<\/entry>').firstMatch(xmlString);
     if (entryMatch == null) {
-      return const UpdateCheckResult(
+      return UpdateCheckResult(
         hasUpdate: false,
         latestVersion: AppInfo.currentVersion,
         releaseNotes: 'You are using the latest version of CashBook.',
