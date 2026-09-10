@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.7.8';
-  static int _buildNumber = 82;
+  static String _version = '1.7.9';
+  static int _buildNumber = 83;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.7.9',
+      title: 'About Hub & Versioning Updates',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Integrated dynamic PackageInfo version resolution for accurate GitHub update checks.',
+        'Refined About & Updates hub with rate-limit resilient Atom feed fallback.',
+        'General performance improvements and code cleanup.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.7.8',
       title: 'Time Display & About Hub',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Added time display alongside dates in the Home activity feed and Transactions list.',
         'Interactive Home feed: tap any transaction to view details, edit, duplicate, or delete.',
