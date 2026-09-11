@@ -1,30 +1,30 @@
-# 🚀 CashBook Release Notes - v1.8.3 (Build 87)
+# 🚀 CashBook Release Notes - v1.8.4 (Build 88)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.3-build87.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.4-build88.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.3
+## 🌟 What's New in v1.8.4
 
-### 1. ⚡ Direct Update Link & Tag Matching Optimization
-- **Sanitized URL Tag Encoding**: URL-encoded tags (`%2B`) with base version deduplication to guarantee 100% accurate download target matching.
-- **Failover & Recovery State**: Added 1-tap **"Retry Download"** and clear recovery cues when an APK asset is being attached.
+### 1. 📲 Native Direct Android Package Installer
+- **Native FileProvider & MethodChannel**: The "Install Update" button now directly opens the Android system package installer dialog (`application/vnd.android.package-archive` with read permissions), eliminating any unwanted browser redirect loops.
+- **Added Permission**: Added `REQUEST_INSTALL_PACKAGES` to AndroidManifest.
 
-### 2. 📥 In-App Download Progress & Direct Native Installer
-- **Live Streaming Progress Bar**: Live streaming binary download with speed counter (`MB/s`), total megabytes, and cancelability.
-- **Direct Package Installer Launch**: Prompts native package installer on download completion.
+### 2. 🔑 Unified Release Signing Keystore
+- **Eliminated Package Conflict Error**: Release builds are now signed with a consistent project release keystore across local builds and CI/CD pipelines. This ensures updates install in-place without "Package conflicts with an existing package" errors.
 
-### 3. ⚙️ Configurable Auto-Update Check Frequency
-- Choose between `Every Startup`, `Once Daily`, `Once a Week`, or `Manual Only` with persistent SQLite storage.
+### 3. ⚡ Optimized Update Link Matching & Resilient Download
+- Guaranteed URL-encoded tag formatting and automatic retry actions if network hiccups occur.
 
 ---
 
-## 🌟 Previous Features (v1.8.0 - v1.8.2)
+## 🌟 Previous Features (v1.8.0 - v1.8.3)
 
-- **Two-Tier Resilient Check**: GitHub REST API + Atom feed & raw repo rate-limit bypass.
-- **Glassmorphic Popup Dialog**: Beautiful non-blocking update notification on app startup.
-- **Interactive Radar Scanner**: Dedicated manual update check in Settings with pulse wave animations.
+- **In-App Streaming Progress Bar**: Download releases with live download speed (`MB/s`) and percentage counter.
+- **Configurable Frequency**: Startup, Daily, Weekly, or Manual update checks in Settings.
+- **Two-Tier Resilient Check**: GitHub REST API + rate-limit free Atom feed fallback.
+- **Glassmorphic Popup Dialog & Radar Scanner**: Dedicated manual and automatic update check surfaces.
 
 ---
 

@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.3';
-  static int _buildNumber = 87;
+  static String _version = '1.8.4';
+  static int _buildNumber = 88;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.4',
+      title: 'Native Android Installer & Unified Release Keystore',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Integrated native Android FileProvider + MethodChannel to prompt direct system package installer on completion.',
+        'Unified release signing keystore to resolve Android package signature conflict during in-place app updates.',
+        'Added REQUEST_INSTALL_PACKAGES permission in AndroidManifest.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.3',
       title: 'Update Link Optimization & Retry Support',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Optimized direct APK download URL encoding and tag matching.',
         'Added 1-tap retry download action and friendly 404 recovery state.',

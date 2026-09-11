@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -279,12 +280,27 @@ class AppUpdateService {
     }
   }
 
+  static const MethodChannel _installerChannel =
+      MethodChannel('com.likhs.cashbook/app_installer');
+
   /// Attempts to launch installation of the downloaded APK file.
   static Future<bool> installApk(String filePath) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return false;
 
+      // 1. Try native Android FileProvider + ACTION_VIEW intent first
+      if (Platform.isAndroid) {
+        try {
+          final success = await _installerChannel.invokeMethod<bool>(
+            'installApk',
+            {'filePath': filePath},
+          );
+          if (success == true) return true;
+        } catch (_) {}
+      }
+
+      // 2. Fallback to Uri.file launch if supported
       final uri = Uri.file(filePath);
       if (await canLaunchUrl(uri)) {
         return await launchUrl(uri, mode: LaunchMode.externalApplication);
