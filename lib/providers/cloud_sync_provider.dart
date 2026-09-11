@@ -47,21 +47,12 @@ class CloudSyncProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isInitialized => _isInitialized;
 
-  static const String _legacyAndroidClientId =
-      '879746739863-9l6eks9fvu0jg0d194mejg4p8cg7i12g.apps.googleusercontent.com';
-
   Future<String?> getServerClientId() async {
     final saved = await _databaseService.getSetting(_serverClientIdKey);
-    if (saved != null && saved.trim().isNotEmpty && saved.trim() != _legacyAndroidClientId) {
+    if (saved != null && saved.trim().isNotEmpty) {
       return saved.trim();
     }
     if (GoogleAuthConfig.defaultServerClientId.trim().isNotEmpty) {
-      if (saved == _legacyAndroidClientId) {
-        await _databaseService.setSetting(
-          _serverClientIdKey,
-          GoogleAuthConfig.defaultServerClientId.trim(),
-        );
-      }
       return GoogleAuthConfig.defaultServerClientId.trim();
     }
     return null;

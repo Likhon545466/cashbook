@@ -7,5 +7,5 @@ class GoogleAuthConfig {
   ///
   /// Can be set here as default, or configured dynamically by the user in app settings.
   static const String defaultServerClientId =
-      '879746739863-af2rv6mstrptpisldkds70ic9rcd0ju1.apps.googleusercontent.com';
+      '879746739863-9l6eks9fvu0jg0d194mejg4p8cg7i12g.apps.googleusercontent.com';
 }

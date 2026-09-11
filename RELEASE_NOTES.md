@@ -1,22 +1,22 @@
-# 🚀 CashBook Release Notes - v1.8.8 (Build 92)
+# 🚀 CashBook Release Notes - v1.8.9 (Build 93)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.8-build92.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.9-build93.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.8
+## 🌟 What's New in v1.8.9
 
-### 1. 🔑 Google OAuth 2.0 Web Client ID Integration & Cloud Sync
-- **OAuth Web Client ID Fix**: Configured the official Google Cloud Console Web Application Client ID (`879746739863-af2rv6mstrptpisldkds70ic9rcd0ju1.apps.googleusercontent.com`) to ensure seamless Google Play Services authentication for Drive scopes on Android.
-- **Legacy ID Auto-Migration**: Added automatic detection and migration in `CloudSyncProvider` for any legacy Android Client ID stored in local settings.
-- **Verified Cloud Backup & Restore**: Robust Google Drive `appDataFolder` backup, metadata sync, and cross-device restore.
+### 1. 🔑 Exact Build 86 Google Authentication Parity
+- **Restored Build 86 Configuration**: Restored the exact Google Client ID configuration (`879746739863-9l6eks9fvu0jg0d194mejg4p8cg7i12g.apps.googleusercontent.com`) and authentication flow that operated cleanly in Build 86.
+- **Drive AppData Sync**: Preserved full Google Drive `appDataFolder` sync and restore capability.
 
-### 2. 🔑 Retained Build 86 Signing Key
-- **Signature Compatibility**: Retained the original signing keystore configuration (`01:D1:FE:DE:79:81:2C:DA:86:24:16:40:77:41:FD:9C:8F:D3:7E:A8`) so in-place upgrades and Google Sign-In match without signature collisions.
+### 2. 🔐 Bundled Keystore for GitHub Actions CI/CD
+- **Zero Signature Divergence**: Bundled the Build 86 release signing keystore (`cashbook.keystore`) directly into the project repository.
+- **CI/CD Matching Fingerprint**: GitHub Actions builds on Ubuntu now sign using the exact same keystore with SHA-1 `01:D1:FE:DE:79:81:2C:DA:86:24:16:40:77:41:FD:9C:8F:D3:7E:A8`, ensuring in-app updates and downloaded GitHub release APKs never fail Google Play Services identity verification.
 
 ### 3. 📲 Native Direct Android Package Installer
-- **Native FileProvider & MethodChannel**: 1-tap in-app APK installer with `REQUEST_INSTALL_PACKAGES` permission.
+- **Native FileProvider & MethodChannel**: 1-tap in-place APK installer without browser redirects.
 
 ---
 

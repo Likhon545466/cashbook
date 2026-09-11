@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.8';
-  static int _buildNumber = 92;
+  static String _version = '1.8.9';
+  static int _buildNumber = 93;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.9',
+      title: 'Full Build 86 Parity & Bundled Keystore for GitHub CI/CD',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Restored exact Build 86 Google Auth logic and configuration.',
+        'Bundled Build 86 release keystore directly into CI/CD pipeline to eliminate signature divergence on GitHub builds.',
+        'Guaranteed identical SHA-1 fingerprint on local builds and GitHub Actions releases.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.8',
       title: 'Google OAuth Web Client Fix & Cloud Sync',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Configured Google Cloud OAuth 2.0 Web Application Client ID for seamless Google Sign-In.',
         'Added automated legacy Client ID migration in CloudSyncProvider.',

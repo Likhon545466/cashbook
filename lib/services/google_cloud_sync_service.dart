@@ -101,10 +101,9 @@ class GoogleCloudSyncService {
     account ??= await signInSilently(serverClientId: _currentServerClientId);
     if (account == null) return null;
     try {
-      var authorization = await account.authorizationClient
+      final authorization = await account.authorizationClient
           .authorizationForScopes(_driveScopes);
-      authorization ??= await account.authorizationClient
-          .authorizeScopes(_driveScopes);
+      if (authorization == null) return null;
       final client = authorization.authClient(scopes: _driveScopes);
       return drive.DriveApi(client);
     } catch (e) {
