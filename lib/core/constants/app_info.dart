@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.7';
-  static int _buildNumber = 91;
+  static String _version = '1.8.8';
+  static int _buildNumber = 92;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.8',
+      title: 'Google OAuth Web Client Fix & Cloud Sync',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Configured Google Cloud OAuth 2.0 Web Application Client ID for seamless Google Sign-In.',
+        'Added automated legacy Client ID migration in CloudSyncProvider.',
+        'Verified Google Drive AppData backup and restore with full test coverage.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.7',
       title: 'Restored Build 86 Signing & Verified Google Drive Sync',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Restored original build signing configuration exactly matching Build 86.',
         'Seamless Google Sign-In and Google Drive AppData synchronization.',

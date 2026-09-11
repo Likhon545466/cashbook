@@ -103,11 +103,8 @@ class GoogleCloudSyncService {
     try {
       var authorization = await account.authorizationClient
           .authorizationForScopes(_driveScopes);
-      if (authorization == null) {
-        authorization = await account.authorizationClient
-            .authorizeScopes(_driveScopes);
-      }
-      if (authorization == null) return null;
+      authorization ??= await account.authorizationClient
+          .authorizeScopes(_driveScopes);
       final client = authorization.authClient(scopes: _driveScopes);
       return drive.DriveApi(client);
     } catch (e) {

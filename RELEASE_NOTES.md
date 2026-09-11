@@ -1,34 +1,25 @@
-# 🚀 CashBook Release Notes - v1.8.7 (Build 91)
+# 🚀 CashBook Release Notes - v1.8.8 (Build 92)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.7-build91.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.8-build92.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.7
+## 🌟 What's New in v1.8.8
 
-### 1. 🔑 Restored Build 86 Signing Configuration & Google Sign-In
-- **Exact Signing Key Restoration**: Restored the build signing configuration to match Build 86 perfectly.
-- **Google Sign-In & Google Drive Cloud Sync**: Seamless Google Drive appDataFolder backups and cross-device restores.
+### 1. 🔑 Google OAuth 2.0 Web Client ID Integration & Cloud Sync
+- **OAuth Web Client ID Fix**: Configured the official Google Cloud Console Web Application Client ID (`879746739863-af2rv6mstrptpisldkds70ic9rcd0ju1.apps.googleusercontent.com`) to ensure seamless Google Play Services authentication for Drive scopes on Android.
+- **Legacy ID Auto-Migration**: Added automatic detection and migration in `CloudSyncProvider` for any legacy Android Client ID stored in local settings.
+- **Verified Cloud Backup & Restore**: Robust Google Drive `appDataFolder` backup, metadata sync, and cross-device restore.
 
-### 2. 📲 Native Direct Android Package Installer
-- **Native FileProvider & MethodChannel**: Tapping "Install Update" prompts Android's system package installer directly without web redirects.
-- **Added Permission**: `REQUEST_INSTALL_PACKAGES` permission in AndroidManifest.
+### 2. 🔑 Retained Build 86 Signing Key
+- **Signature Compatibility**: Retained the original signing keystore configuration (`01:D1:FE:DE:79:81:2C:DA:86:24:16:40:77:41:FD:9C:8F:D3:7E:A8`) so in-place upgrades and Google Sign-In match without signature collisions.
 
-### 3. ⚡ Optimized Update Link Matching & Resilient Download
-- Guaranteed URL-encoded tag formatting and automatic retry actions if network hiccups occur.
-
----
-
-## 🌟 Previous Features (v1.8.0 - v1.8.6)
-
-- **In-App Streaming Progress Bar**: Download releases with live download speed (`MB/s`) and percentage counter.
-- **Configurable Frequency**: Startup, Daily, Weekly, or Manual update checks in Settings.
-- **Two-Tier Resilient Check**: GitHub REST API + rate-limit free Atom feed fallback.
-- **Glassmorphic Popup Dialog & Radar Scanner**: Dedicated manual and automatic update check surfaces.
+### 3. 📲 Native Direct Android Package Installer
+- **Native FileProvider & MethodChannel**: 1-tap in-app APK installer with `REQUEST_INSTALL_PACKAGES` permission.
 
 ---
 
 ## 🛠 Quality & Performance
 - 🧪 **100% Test Coverage**: All 89 unit, service, model, and widget tests passing.
-- ⚡ **Zero Static Analysis Warnings**: Clean pass on `flutter analyze`.
+- ⚡ **Zero Static Analysis Warnings**: Clean pass on `dart analyze`.
