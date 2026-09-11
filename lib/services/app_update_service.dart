@@ -190,12 +190,15 @@ class AppUpdateService {
       final response = await httpClient.send(request);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        final errorMsg = response.statusCode == 404
+            ? 'Release APK is not yet attached on GitHub (HTTP 404).'
+            : 'Server responded with HTTP ${response.statusCode}';
         yield DownloadProgress(
           receivedBytes: 0,
           totalBytes: 0,
           progress: 0,
           isFailed: true,
-          errorMessage: 'Server responded with HTTP ${response.statusCode}',
+          errorMessage: errorMsg,
         );
         return;
       }

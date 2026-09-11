@@ -567,6 +567,25 @@ class _UpdatePopupDialogState extends State<UpdatePopupDialog> {
                         ),
                       ),
                     ),
+                  ] else if (isFailed) ...[
+                    FilledButton.icon(
+                      onPressed: () => _startInAppDownload(downloadUrl),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: scheme.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                      label: const Text(
+                        'Retry Download',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 8),
                   ] else ...[
                     FilledButton.icon(
