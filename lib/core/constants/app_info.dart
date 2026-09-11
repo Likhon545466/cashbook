@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.5';
-  static int _buildNumber = 89;
+  static String _version = '1.8.6';
+  static int _buildNumber = 90;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.6',
+      title: 'Google Sign-In & Native Installer Production Release',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Aligned release signing keystore with Google Cloud OAuth 2.0 Client credentials.',
+        'Verified Google Sign-In and Google Drive Cloud Sync authentication flow.',
+        'Native FileProvider package installer integration for instant 1-tap in-place updates.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.5',
       title: 'Google OAuth Certificate Alignment & Release Key',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Aligned signing certificate SHA-1 fingerprint with Google Cloud Console OAuth client credentials.',
         'Restored Google Sign-In and Google Drive Cloud Sync functionality on release builds.',
