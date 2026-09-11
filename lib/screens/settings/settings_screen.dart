@@ -5,6 +5,7 @@ import '../../core/constants/app_info.dart';
 import '../../providers/cloud_sync_provider.dart';
 import '../../providers/security_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/update_checker_modal.dart';
 import '../transactions/recurring_transactions_screen.dart';
 import 'about_screen.dart';
 import 'appearance_screen.dart';
@@ -287,14 +288,21 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const _SectionLabel('About'),
+          const _SectionLabel('About & Updates'),
           const SizedBox(height: 8),
           _CardGroup(
             children: [
               _Tile(
+                icon: Icons.system_update_rounded,
+                title: 'Check for Updates',
+                subtitle: 'Verify GitHub releases & latest APK build',
+                onTap: () => UpdateCheckerModal.show(context),
+              ),
+              const Divider(height: 1),
+              _Tile(
                 icon: Icons.info_outline_rounded,
                 title: 'About CashBook',
-                subtitle: '${AppInfo.fullVersion} • Changelog, GitHub & Updates',
+                subtitle: '${AppInfo.fullVersion} • Changelog & GitHub',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AboutScreen()),

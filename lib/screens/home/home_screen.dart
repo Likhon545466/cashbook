@@ -12,8 +12,10 @@ import '../../providers/savings_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../utils/money_formatter.dart';
+import '../../services/app_update_service.dart';
 import '../../widgets/book_picker_sheet.dart';
 import '../../widgets/transaction_tile.dart';
+import '../../widgets/update_popup_dialog.dart';
 import '../debt/debt_screen.dart';
 import '../savings/savings_screen.dart';
 import '../transactions/add_transaction_screen.dart';
@@ -29,6 +31,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static bool _startupUpdateChecked = false;
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +40,26 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       context.read<SavingsProvider>().load();
       context.read<DebtProvider>().load();
+
+      if (!_startupUpdateChecked) {
+        _startupUpdateChecked = true;
+        _checkAppUpdateSilently();
+      }
     });
+  }
+
+  Future<void> _checkAppUpdateSilently() async {
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+
+    try {
+      final service = AppUpdateService();
+      final result = await service.checkForUpdates();
+      if (!mounted) return;
+      if (result.hasUpdate) {
+        await UpdatePopupDialog.show(context, result);
+      }
+    } catch (_) {}
   }
 
   Future<void> _openAdd(String type) async {

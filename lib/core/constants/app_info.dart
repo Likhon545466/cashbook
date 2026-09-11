@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.7.9';
-  static int _buildNumber = 83;
+  static String _version = '1.8.0';
+  static int _buildNumber = 84;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,21 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.0',
+      title: 'In-App GitHub Release Update System',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Automatic startup update checker with glassmorphic dialog notification.',
+        'Interactive in-app update checker modal in Settings with animated radar scanner.',
+        'Resilient two-tier fallback: GitHub REST API + Atom feed & raw repo rate-limit bypass.',
+        'Direct 1-tap APK downloads with URL-encoded release tag links.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.7.9',
       title: 'About Hub & Versioning Updates',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Integrated dynamic PackageInfo version resolution for accurate GitHub update checks.',
         'Refined About & Updates hub with rate-limit resilient Atom feed fallback.',

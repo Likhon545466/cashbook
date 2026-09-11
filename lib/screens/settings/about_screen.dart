@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_info.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/app_update_service.dart';
+import '../../widgets/update_checker_modal.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -289,13 +290,18 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                 ),
-                if (!_isChecking)
+                if (!_isChecking) ...[
+                  IconButton(
+                    tooltip: 'Update Modal',
+                    onPressed: () => UpdateCheckerModal.show(context),
+                    icon: const Icon(Icons.open_in_full_rounded, size: 18),
+                  ),
                   IconButton(
                     tooltip: 'Check Again',
                     onPressed: _checkForUpdates,
                     icon: const Icon(Icons.refresh_rounded, size: 20),
-                  )
-                else
+                  ),
+                ] else
                   const Padding(
                     padding: EdgeInsets.all(8),
                     child: SizedBox(
@@ -307,35 +313,94 @@ class _AboutScreenState extends State<AboutScreen> {
               ],
             ),
 
-            if (isUpdateAvailable &&
-                result.releaseNotes != null &&
-                result.releaseNotes!.isNotEmpty) ...[
+            if (isUpdateAvailable) ...[
               const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (result.releaseTitle != null)
-                      Text(
-                        result.releaseTitle!,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+              // Chips for Size and Date
+              Row(
+                children: [
+                  if (result.formattedApkSize != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
                       ),
-                    const SizedBox(height: 4),
-                    Text(
-                      result.releaseNotes!,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.file_present_rounded, size: 13),
+                          const SizedBox(width: 4),
+                          Text(
+                            result.formattedApkSize!,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 6),
                   ],
-                ),
+                  if (result.publishedAt != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, size: 13),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('MMM d, yyyy').format(result.publishedAt!),
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
+              if (result.releaseNotes != null &&
+                  result.releaseNotes!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (result.releaseTitle != null)
+                        Text(
+                          result.releaseTitle!,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        result.releaseNotes!,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
