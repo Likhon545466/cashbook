@@ -28,9 +28,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("cashbook-release.keystore")
-            storePassword = "cashbook_release_key"
-            keyAlias = "cashbook"
-            keyPassword = "cashbook_release_key"
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 

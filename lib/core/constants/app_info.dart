@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.4';
-  static int _buildNumber = 88;
+  static String _version = '1.8.5';
+  static int _buildNumber = 89;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.5',
+      title: 'Google OAuth Certificate Alignment & Release Key',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Aligned signing certificate SHA-1 fingerprint with Google Cloud Console OAuth client credentials.',
+        'Restored Google Sign-In and Google Drive Cloud Sync functionality on release builds.',
+        'Maintained native direct Android package installer and update integrity.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.4',
       title: 'Native Android Installer & Unified Release Keystore',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Integrated native Android FileProvider + MethodChannel to prompt direct system package installer on completion.',
         'Unified release signing keystore to resolve Android package signature conflict during in-place app updates.',
