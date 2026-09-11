@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.6';
-  static int _buildNumber = 90;
+  static String _version = '1.8.7';
+  static int _buildNumber = 91;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.7',
+      title: 'Restored Build 86 Signing & Verified Google Drive Sync',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Restored original build signing configuration exactly matching Build 86.',
+        'Seamless Google Sign-In and Google Drive AppData synchronization.',
+        'Retained direct native Android FileProvider package installer.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.6',
       title: 'Google Sign-In & Native Installer Production Release',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Aligned release signing keystore with Google Cloud OAuth 2.0 Client credentials.',
         'Verified Google Sign-In and Google Drive Cloud Sync authentication flow.',
