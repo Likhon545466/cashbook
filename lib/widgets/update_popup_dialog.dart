@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,28 +9,117 @@ import '../core/constants/app_info.dart';
 import '../core/theme/app_colors.dart';
 import '../services/app_update_service.dart';
 
-class UpdatePopupDialog extends StatelessWidget {
+class UpdatePopupDialog extends StatefulWidget {
   final UpdateCheckResult result;
+  final AppUpdateService? updateService;
 
   const UpdatePopupDialog({
     super.key,
     required this.result,
+    this.updateService,
   });
 
   /// Displays the update dialog as a glassmorphic modal popup.
   static Future<void> show(
     BuildContext context,
-    UpdateCheckResult result,
-  ) async {
+    UpdateCheckResult result, {
+    AppUpdateService? updateService,
+  }) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (_) => UpdatePopupDialog(result: result),
+      builder: (_) => UpdatePopupDialog(
+        result: result,
+        updateService: updateService,
+      ),
     );
   }
 
-  Future<void> _openUrl(BuildContext context, String url) async {
+  @override
+  State<UpdatePopupDialog> createState() => _UpdatePopupDialogState();
+}
+
+class _UpdatePopupDialogState extends State<UpdatePopupDialog> {
+  late final AppUpdateService _service;
+  StreamSubscription<DownloadProgress>? _downloadSub;
+  DownloadProgress? _progress;
+  bool _isDownloading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = widget.updateService ?? AppUpdateService();
+  }
+
+  @override
+  void dispose() {
+    _downloadSub?.cancel();
+    super.dispose();
+  }
+
+  void _startInAppDownload(String downloadUrl) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isDownloading = true;
+      _progress = const DownloadProgress(
+        receivedBytes: 0,
+        totalBytes: 0,
+        progress: 0,
+      );
+    });
+
+    _downloadSub?.cancel();
+    _downloadSub = _service.downloadApkFile(url: downloadUrl).listen(
+      (progress) {
+        if (!mounted) return;
+        setState(() {
+          _progress = progress;
+          if (progress.isCompleted) {
+            _isDownloading = false;
+          }
+        });
+      },
+      onError: (err) {
+        if (!mounted) return;
+        setState(() {
+          _isDownloading = false;
+          _progress = DownloadProgress(
+            receivedBytes: 0,
+            totalBytes: 0,
+            progress: 0,
+            isFailed: true,
+            errorMessage: err.toString(),
+          );
+        });
+      },
+    );
+  }
+
+  void _cancelDownload() {
+    HapticFeedback.selectionClick();
+    _downloadSub?.cancel();
+    setState(() {
+      _isDownloading = false;
+      _progress = null;
+    });
+  }
+
+  Future<void> _installApk(String filePath) async {
+    await HapticFeedback.selectionClick();
+    final success = await AppUpdateService.installApk(filePath);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not trigger package installer. Opening browser download...'),
+        ),
+      );
+      final downloadUrl = widget.result.downloadUrl ?? AppInfo.githubReleasesUrl;
+      _openUrl(downloadUrl);
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
     await HapticFeedback.selectionClick();
     final uri = Uri.tryParse(url);
     if (uri == null) return;
@@ -39,13 +129,13 @@ class UpdatePopupDialog extends StatelessWidget {
         uri,
         mode: LaunchMode.externalApplication,
       );
-      if (!launched && context.mounted) {
+      if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open $url')),
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open link.')),
         );
@@ -58,6 +148,7 @@ class UpdatePopupDialog extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final result = widget.result;
 
     final formattedDate = result.publishedAt != null
         ? DateFormat('MMM d, yyyy').format(result.publishedAt!)
@@ -66,6 +157,9 @@ class UpdatePopupDialog extends StatelessWidget {
     final apkSize = result.formattedApkSize;
     final downloadUrl = result.downloadUrl ?? AppInfo.githubReleasesUrl;
     final releaseUrl = result.htmlUrl ?? AppInfo.githubReleasesUrl;
+
+    final isCompleted = _progress?.isCompleted == true;
+    final isFailed = _progress?.isFailed == true;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -125,8 +219,12 @@ class UpdatePopupDialog extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.rocket_launch_rounded,
+                      child: Icon(
+                        isCompleted
+                            ? Icons.check_circle_rounded
+                            : _isDownloading
+                                ? Icons.downloading_rounded
+                                : Icons.rocket_launch_rounded,
                         color: Colors.white,
                         size: 32,
                       ),
@@ -135,10 +233,14 @@ class UpdatePopupDialog extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // Title & Subtitle
-                  const Text(
-                    'Update Available!',
+                  Text(
+                    isCompleted
+                        ? 'Download Complete!'
+                        : _isDownloading
+                            ? 'Downloading Update...'
+                            : 'Update Available!',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.4,
@@ -146,7 +248,11 @@ class UpdatePopupDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'A new version of CashBook is ready for you.',
+                    isCompleted
+                        ? 'Ready to install CashBook update.'
+                        : _isDownloading
+                            ? 'Please keep the app open during download.'
+                            : 'A new version of CashBook is ready for you.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: isDark
@@ -272,8 +378,112 @@ class UpdatePopupDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // Release notes box
-                  if (result.releaseNotes != null &&
+                  // In-App Download Progress Card
+                  if (_isDownloading || isCompleted || isFailed) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isFailed
+                              ? scheme.error.withValues(alpha: 0.5)
+                              : isCompleted
+                                  ? AppSemanticColors.savings(context).withValues(alpha: 0.5)
+                                  : scheme.primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isCompleted
+                                    ? 'Downloaded APK'
+                                    : isFailed
+                                        ? 'Download Failed'
+                                        : 'Downloading...',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (_progress != null && !_progress!.isFailed)
+                                Text(
+                                  '${_progress!.percentage}%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: isCompleted
+                                  ? 1.0
+                                  : isFailed
+                                      ? 0.0
+                                      : _progress?.progress ?? 0.0,
+                              minHeight: 8,
+                              backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isCompleted
+                                    ? AppSemanticColors.savings(context)
+                                    : isFailed
+                                        ? scheme.error
+                                        : scheme.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (_progress != null && !isFailed && !isCompleted)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${_progress!.formattedReceived} / ${_progress!.formattedTotal}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark
+                                        ? const Color(0xFF96A19D)
+                                        : const Color(0xFF6F7774),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  _progress!.formattedSpeed,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: scheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (isFailed)
+                            Text(
+                              _progress?.errorMessage ?? 'An error occurred during download.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: scheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Release notes box (shown when not actively downloading)
+                  if (!_isDownloading &&
+                      result.releaseNotes != null &&
                       result.releaseNotes!.trim().isNotEmpty) ...[
                     Container(
                       constraints: const BoxConstraints(maxHeight: 140),
@@ -311,32 +521,73 @@ class UpdatePopupDialog extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                  ] else ...[
+                  ] else if (!_isDownloading) ...[
                     const SizedBox(height: 8),
                   ],
 
-                  // Action Buttons
-                  FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _openUrl(context, downloadUrl);
-                    },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  // Dynamic Action Buttons
+                  if (isCompleted && _progress?.filePath != null) ...[
+                    FilledButton.icon(
+                      onPressed: () => _installApk(_progress!.filePath!),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: AppSemanticColors.savings(context),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.install_mobile_rounded, size: 20),
+                      label: const Text(
+                        'Install Update',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    label: const Text(
-                      'Download APK',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                    const SizedBox(height: 8),
+                  ] else if (_isDownloading) ...[
+                    OutlinedButton.icon(
+                      onPressed: _cancelDownload,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        side: BorderSide(
+                          color: scheme.error.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      icon: Icon(Icons.cancel_outlined, size: 18, color: scheme.error),
+                      label: Text(
+                        'Cancel Download',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.error,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                  ] else ...[
+                    FilledButton.icon(
+                      onPressed: () => _startInAppDownload(downloadUrl),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 20),
+                      label: const Text(
+                        'Download APK',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
 
                   Row(
                     children: [
@@ -344,7 +595,7 @@ class UpdatePopupDialog extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            _openUrl(context, releaseUrl);
+                            _openUrl(releaseUrl);
                           },
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -438,3 +689,4 @@ class _MetadataChip extends StatelessWidget {
     );
   }
 }
+

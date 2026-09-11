@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:cashbook/core/constants/app_info.dart';
 import 'package:cashbook/services/app_update_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('AppUpdateService Unit Tests', () {
     test('detects update available when remote version is higher via JSON', () async {
       final mockClient = MockClient((request) async {
@@ -252,6 +255,64 @@ void main() {
       expect(result.isSuccess, isFalse);
       expect(result.hasUpdate, isFalse);
       expect(result.errorMessage, contains('Could not connect'));
+    });
+
+    test('downloadApkFile streams progress and writes chunks to file', () async {
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        final bytes = List.generate(1024 * 50, (i) => i % 256);
+        return http.StreamedResponse(
+          Stream.value(bytes),
+          200,
+          contentLength: bytes.length,
+        );
+      });
+
+      final service = AppUpdateService(client: mockClient);
+      final saveFile = File('test_download_tmp.apk');
+      if (await saveFile.exists()) await saveFile.delete();
+
+      final progressEvents = await service
+          .downloadApkFile(
+            url: 'https://example.com/test.apk',
+            savePath: saveFile.path,
+            client: mockClient,
+          )
+          .toList();
+
+      expect(progressEvents.isNotEmpty, isTrue);
+      final last = progressEvents.last;
+      expect(last.isCompleted, isTrue);
+      expect(last.progress, 1.0);
+      expect(last.receivedBytes, 1024 * 50);
+      expect(last.percentage, 100);
+      expect(last.formattedTotal, '50.0 KB');
+
+      if (await saveFile.exists()) await saveFile.delete();
+    });
+
+    test('downloadApkFile reports failure on non-200 HTTP status', () async {
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        return http.StreamedResponse(
+          Stream.value([]),
+          404,
+        );
+      });
+
+      final service = AppUpdateService(client: mockClient);
+      final saveFile = File('test_download_404.apk');
+      final progressEvents = await service
+          .downloadApkFile(
+            url: 'https://example.com/missing.apk',
+            savePath: saveFile.path,
+            client: mockClient,
+          )
+          .toList();
+
+      expect(progressEvents.length, 1);
+      expect(progressEvents.first.isFailed, isTrue);
+      expect(progressEvents.first.errorMessage, contains('404'));
+
+      if (await saveFile.exists()) await saveFile.delete();
     });
   });
 }

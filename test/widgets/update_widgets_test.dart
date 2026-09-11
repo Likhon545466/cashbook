@@ -4,6 +4,7 @@ import 'package:cashbook/services/app_update_service.dart';
 import 'package:cashbook/widgets/update_checker_modal.dart';
 import 'package:cashbook/widgets/update_popup_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -196,5 +197,72 @@ void main() {
 
       expect(find.text('You\'re Up to Date!'), findsOneWidget);
     });
+
+    testWidgets('UpdatePopupDialog displays in-app downloading progress bar when triggered', (
+      tester,
+    ) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/path_provider'),
+        (call) async => '.',
+      );
+
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        final bytes = List.generate(1024 * 10, (i) => i % 256);
+        return http.StreamedResponse(
+          Stream.value(bytes),
+          200,
+          contentLength: bytes.length,
+        );
+      });
+
+      final service = AppUpdateService(client: mockClient);
+      final updateResult = UpdateCheckResult(
+        hasUpdate: true,
+        latestVersion: '2.0.0',
+        latestBuildNumber: 99,
+        releaseTitle: 'CashBook v2.0.0 Feature Release',
+        releaseNotes: 'Performance improvements',
+        apkSizeBytes: 1024 * 10,
+        downloadUrl: 'https://example.com/CashBook.apk',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: ElevatedButton(
+                  onPressed: () => UpdatePopupDialog.show(
+                    context,
+                    updateResult,
+                    updateService: service,
+                  ),
+                  child: const Text('Open Dialog'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Download APK'), findsOneWidget);
+
+      // Tap Download APK to start streaming inside runAsync for real I/O
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Download APK'));
+        await Future.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pumpAndSettle();
+
+      // Download completed
+      expect(find.text('Download Complete!'), findsOneWidget);
+      expect(find.text('Install Update'), findsOneWidget);
+    });
   });
 }
+
+

@@ -1,6 +1,39 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_info.dart';
+
+/// Progress state of an ongoing in-app APK download.
+class DownloadProgress {
+  final int receivedBytes;
+  final int totalBytes;
+  final double progress; // 0.0 to 1.0
+  final double speedBytesPerSec;
+  final bool isCompleted;
+  final bool isFailed;
+  final String? errorMessage;
+  final String? filePath;
+
+  const DownloadProgress({
+    required this.receivedBytes,
+    required this.totalBytes,
+    required this.progress,
+    this.speedBytesPerSec = 0,
+    this.isCompleted = false,
+    this.isFailed = false,
+    this.errorMessage,
+    this.filePath,
+  });
+
+  String get formattedReceived => AppUpdateService.formatBytes(receivedBytes);
+  String get formattedTotal => AppUpdateService.formatBytes(totalBytes);
+  String get formattedSpeed =>
+      '${AppUpdateService.formatBytes(speedBytesPerSec.toInt())}/s';
+  int get percentage => (progress * 100).toInt();
+}
 
 /// Result of checking for app updates on GitHub.
 class UpdateCheckResult {
@@ -114,6 +147,143 @@ class AppUpdateService {
       return 'https://github.com/$owner/$repo/releases/tag/$encodedTag';
     }
     return 'https://github.com/$owner/$repo/releases';
+  }
+
+  /// Downloads an APK from [url] with live streaming progress reporting.
+  /// If [savePath] is omitted, defaults to a file in the temporary directory.
+  Stream<DownloadProgress> downloadApkFile({
+    required String url,
+    String? savePath,
+    http.Client? client,
+  }) async* {
+    final httpClient = client ?? _client;
+    IOSink? sink;
+    File? outputFile;
+
+    try {
+      String targetPath;
+      if (savePath != null) {
+        targetPath = savePath;
+      } else {
+        Directory tempDir;
+        try {
+          tempDir = await getTemporaryDirectory().timeout(
+            const Duration(milliseconds: 200),
+          );
+        } catch (_) {
+          tempDir = Directory.systemTemp;
+        }
+        final rawFileName = url.split('/').last.split('?').first;
+        final sanitizedName = rawFileName.isNotEmpty && rawFileName.endsWith('.apk')
+            ? rawFileName
+            : 'cashbook-update.apk';
+        targetPath = '${tempDir.path}${Platform.pathSeparator}$sanitizedName';
+      }
+
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await httpClient.send(request);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        yield DownloadProgress(
+          receivedBytes: 0,
+          totalBytes: 0,
+          progress: 0,
+          isFailed: true,
+          errorMessage: 'Server responded with HTTP ${response.statusCode}',
+        );
+        return;
+      }
+
+      outputFile = File(targetPath);
+      if (await outputFile.exists()) {
+        try {
+          await outputFile.delete();
+        } catch (_) {}
+      }
+      await outputFile.create(recursive: true);
+      sink = outputFile.openWrite();
+
+      final totalBytes = response.contentLength ?? 0;
+      var receivedBytes = 0;
+      var lastTime = DateTime.now();
+      var bytesSinceLastTime = 0;
+      double currentSpeed = 0;
+
+      // Yield initial 0% progress
+      yield DownloadProgress(
+        receivedBytes: 0,
+        totalBytes: totalBytes,
+        progress: 0,
+        speedBytesPerSec: 0,
+        filePath: targetPath,
+      );
+
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        bytesSinceLastTime += chunk.length;
+
+        final now = DateTime.now();
+        final elapsedMs = now.difference(lastTime).inMilliseconds;
+        if (elapsedMs >= 150) {
+          currentSpeed = (bytesSinceLastTime / (elapsedMs / 1000.0));
+          lastTime = now;
+          bytesSinceLastTime = 0;
+
+          final progress =
+              totalBytes > 0 ? (receivedBytes / totalBytes).clamp(0.0, 1.0) : 0.0;
+          yield DownloadProgress(
+            receivedBytes: receivedBytes,
+            totalBytes: totalBytes,
+            progress: progress,
+            speedBytesPerSec: currentSpeed,
+            filePath: targetPath,
+          );
+        }
+      }
+
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      yield DownloadProgress(
+        receivedBytes: receivedBytes,
+        totalBytes: totalBytes > 0 ? totalBytes : receivedBytes,
+        progress: 1.0,
+        speedBytesPerSec: currentSpeed,
+        isCompleted: true,
+        filePath: targetPath,
+      );
+    } catch (e) {
+      if (sink != null) {
+        try {
+          await sink.close();
+        } catch (_) {}
+      }
+      yield DownloadProgress(
+        receivedBytes: 0,
+        totalBytes: 0,
+        progress: 0,
+        isFailed: true,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+
+  /// Attempts to launch installation of the downloaded APK file.
+  static Future<bool> installApk(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return false;
+
+      final uri = Uri.file(filePath);
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Checks for the latest release via GitHub REST API with automatic rate-limit-free fallbacks.

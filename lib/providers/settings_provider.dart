@@ -4,6 +4,17 @@ import '../core/theme/app_colors.dart';
 import '../services/database_service.dart';
 import '../utils/money_formatter.dart';
 
+enum UpdateFrequency {
+  onStartup('Every Startup', 'Check for updates every time CashBook opens'),
+  daily('Once Daily', 'Check at most once every 24 hours'),
+  weekly('Once a Week', 'Check at most once every 7 days'),
+  manualOnly('Manual Only', 'Never check automatically in the background');
+
+  final String title;
+  final String description;
+  const UpdateFrequency(this.title, this.description);
+}
+
 class SettingsProvider extends ChangeNotifier {
   SettingsProvider(this._databaseService);
 
@@ -17,6 +28,8 @@ class SettingsProvider extends ChangeNotifier {
   static const _currencyCodeKey = 'currency_code';
   static const _dailyReminderEnabledKey = 'daily_reminder_enabled';
   static const _dailyReminderTimeKey = 'daily_reminder_time';
+  static const _updateFrequencyKey = 'update_check_frequency';
+  static const _lastUpdateCheckKey = 'last_update_check_time';
 
   ThemeMode _themeMode = ThemeMode.system;
   MaterialPalette _materialPalette = MaterialPalette.emerald;
@@ -26,6 +39,8 @@ class SettingsProvider extends ChangeNotifier {
   String _currencyCode = 'BDT';
   bool _dailyReminderEnabled = false;
   TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 21, minute: 0);
+  UpdateFrequency _updateFrequency = UpdateFrequency.onStartup;
+  DateTime? _lastUpdateCheckTime;
   bool _isLoaded = false;
 
   ThemeMode get themeMode => _themeMode;
@@ -37,7 +52,28 @@ class SettingsProvider extends ChangeNotifier {
   String get currencyCode => _currencyCode;
   bool get dailyReminderEnabled => _dailyReminderEnabled;
   TimeOfDay get dailyReminderTime => _dailyReminderTime;
+  UpdateFrequency get updateFrequency => _updateFrequency;
+  DateTime? get lastUpdateCheckTime => _lastUpdateCheckTime;
   bool get isLoaded => _isLoaded;
+
+  /// Evaluates whether an automated update check should be performed based on user frequency setting.
+  bool shouldCheckForUpdate() {
+    if (_updateFrequency == UpdateFrequency.manualOnly) return false;
+    if (_updateFrequency == UpdateFrequency.onStartup) return true;
+    if (_lastUpdateCheckTime == null) return true;
+
+    final now = DateTime.now();
+    final diff = now.difference(_lastUpdateCheckTime!);
+
+    if (_updateFrequency == UpdateFrequency.daily) {
+      return diff.inHours >= 24;
+    }
+    if (_updateFrequency == UpdateFrequency.weekly) {
+      return diff.inDays >= 7;
+    }
+
+    return true;
+  }
 
   Future<void> loadTheme() async {
     try {
@@ -52,6 +88,8 @@ class SettingsProvider extends ChangeNotifier {
       final savedCurrencyCode = await _databaseService.getSetting(_currencyCodeKey);
       final savedReminderEnabled = await _databaseService.getSetting(_dailyReminderEnabledKey);
       final savedReminderTime = await _databaseService.getSetting(_dailyReminderTimeKey);
+      final savedUpdateFreq = await _databaseService.getSetting(_updateFrequencyKey);
+      final savedLastCheck = await _databaseService.getSetting(_lastUpdateCheckKey);
 
       _themeMode = switch (savedTheme) {
         'light' => ThemeMode.light,
@@ -82,6 +120,19 @@ class SettingsProvider extends ChangeNotifier {
             _dailyReminderTime = TimeOfDay(hour: h, minute: m);
           }
         }
+      }
+
+      if (savedUpdateFreq != null) {
+        for (final freq in UpdateFrequency.values) {
+          if (freq.name == savedUpdateFreq) {
+            _updateFrequency = freq;
+            break;
+          }
+        }
+      }
+
+      if (savedLastCheck != null) {
+        _lastUpdateCheckTime = DateTime.tryParse(savedLastCheck);
       }
     } finally {
       _isLoaded = true;
@@ -147,6 +198,22 @@ class SettingsProvider extends ChangeNotifier {
     await _databaseService.setSetting(
       _dailyReminderTimeKey,
       '${time.hour}:${time.minute}',
+    );
+  }
+
+  Future<void> setUpdateFrequency(UpdateFrequency value) async {
+    if (_updateFrequency == value) return;
+    _updateFrequency = value;
+    notifyListeners();
+    await _databaseService.setSetting(_updateFrequencyKey, value.name);
+  }
+
+  Future<void> recordUpdateCheckNow() async {
+    _lastUpdateCheckTime = DateTime.now();
+    notifyListeners();
+    await _databaseService.setSetting(
+      _lastUpdateCheckKey,
+      _lastUpdateCheckTime!.toIso8601String(),
     );
   }
 

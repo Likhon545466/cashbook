@@ -1,0 +1,80 @@
+name: Automated Release CI/CD
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build APK & Publish GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Static Analysis
+        run: flutter analyze
+
+      - name: Run Test Suite
+        run: flutter test
+
+      - name: Extract Version Info from Tag
+        id: parse_version
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "Tag: $TAG_NAME"
+          CLEAN_TAG="${TAG_NAME#v}"
+          if [[ "$CLEAN_TAG" == *"+"* ]]; then
+            VERSION_NAME="${CLEAN_TAG%+*}"
+            BUILD_NUMBER="${CLEAN_TAG#*+}"
+          else
+            VERSION_NAME="$CLEAN_TAG"
+            BUILD_NUMBER="1"
+          fi
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "apk_name=CashBook-v${VERSION_NAME}-build${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
+
+      - name: Build Release APK
+        run: |
+          flutter build apk --release --build-name="${{ steps.parse_version.outputs.version_name }}" --build-number="${{ steps.parse_version.outputs.build_number }}"
+          mkdir -p release_dist
+          cp build/app/outputs/flutter-apk/app-release.apk "release_dist/${{ steps.parse_version.outputs.apk_name }}"
+          cd release_dist
+          sha256sum "${{ steps.parse_version.outputs.apk_name }}" > SHA256SUMS.txt
+          cd ..
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "CashBook ${{ github.ref_name }}"
+          body_path: RELEASE_NOTES.md
+          files: |
+            release_dist/${{ steps.parse_version.outputs.apk_name }}
+            release_dist/SHA256SUMS.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -300,6 +300,13 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(height: 1),
               _Tile(
+                icon: Icons.update_rounded,
+                title: 'Update Frequency',
+                subtitle: settings.updateFrequency.title,
+                onTap: () => _showUpdateFrequencyDialog(context),
+              ),
+              const Divider(height: 1),
+              _Tile(
                 icon: Icons.info_outline_rounded,
                 title: 'About CashBook',
                 subtitle: '${AppInfo.fullVersion} • Changelog & GitHub',
@@ -312,6 +319,87 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showUpdateFrequencyDialog(BuildContext context) async {
+    final settings = context.read<SettingsProvider>();
+    final current = settings.updateFrequency;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final scheme = theme.colorScheme;
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF161C1A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Auto Update Check Frequency',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose how frequently CashBook checks GitHub for releases in the background.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isDark ? const Color(0xFF96A19D) : const Color(0xFF6F7774),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...UpdateFrequency.values.map((freq) {
+                final selected = freq == current;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: selected
+                        ? scheme.primary
+                        : (isDark ? Colors.white38 : Colors.black38),
+                  ),
+                  title: Text(
+                    freq.title,
+                    style: TextStyle(
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    freq.description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF96A19D) : const Color(0xFF6F7774),
+                    ),
+                  ),
+                  onTap: () {
+                    settings.setUpdateFrequency(freq);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
     );
   }
 }

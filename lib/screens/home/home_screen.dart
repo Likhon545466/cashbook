@@ -53,9 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     try {
+      final settings = context.read<SettingsProvider>();
+      if (!settings.shouldCheckForUpdate()) return;
+
       final service = AppUpdateService();
       final result = await service.checkForUpdates();
       if (!mounted) return;
+
+      await settings.recordUpdateCheckNow();
+      if (!mounted) return;
+
       if (result.hasUpdate) {
         await UpdatePopupDialog.show(context, result);
       }

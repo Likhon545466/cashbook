@@ -1,37 +1,38 @@
-# 🚀 CashBook Release Notes - v1.8.1 (Build 85)
+# 🚀 CashBook Release Notes - v1.8.2 (Build 86)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.1-build85.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.2-build86.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.1
+## 🌟 What's New in v1.8.2
 
-- 🔄 **OTA Update Verification**: Real-time update checks against live GitHub releases (`v1.8.1+85`).
-- ⚡ **Direct APK Download Acceleration**: URL-encoded tags (`%2B`) for seamless 1-tap updates.
-- 🚀 **Polished Startup Background Check**: Delayed non-blocking check with session deduplication.
+### 1. 📥 In-App Download Progress & Direct Native Installer
+- **Live Streaming Progress Bar**: Download releases directly within CashBook with animated progress, live speed calculation (`MB/s`), downloaded vs total megabytes display, and cancelability.
+- **Direct Package Installer Launch**: Automatically opens the native Android package installer when download finishes, with resilient fallback to the external browser if needed.
 
----
+### 2. ⚙️ Configurable Auto-Update Check Frequency
+- **Customizable Intervals**: Choose background update check frequency in Settings under **About & Updates**:
+  - `Every Startup` (default)
+  - `Once Daily` (24-hour interval)
+  - `Once a Week` (7-day interval)
+  - `Manual Only`
+- **SQLite State Persistence**: Saves preferences and last-checked timestamps across app reboots.
 
-## 🌟 Previous Features (v1.8.0)
-
-### 1. 🔄 In-App GitHub Release Update System
-- **Two-Tier Resilient Check**: Automatically checks GitHub REST API for new releases, with an instant rate-limit-free fallback to `releases.atom` and raw repository version files (`.cashbook_version`, `pubspec.yaml`).
-- **Direct 1-Tap APK Downloads**: Constructs direct download links with properly URL-encoded release tags (`+` as `%2B`) to guarantee seamless downloads without 404 errors.
-- **Accurate Build Number & Semantic Comparison**: Correctly detects newer versions even across build numbers.
-
-### 2. 🚀 Automatic Startup Update Popup Dialog
-- **Non-Blocking Background Check**: Checks silently ~2.2s after app startup so opening the app remains lightning fast.
-- **Glassmorphic Presentation**: Clean glass card layout displaying current version vs new version pills, release date, formatted APK size chips, and scrollable release notes.
-- **Quick Action Buttons**: 1-tap **"Download APK"**, **"GitHub Release"**, or **"Later"**.
-
-### 3. 🔍 Interactive Update Checker Modal in Settings
-- **Animated Radar Scanner**: Dedicated manual update checker in Settings and About hub featuring animated pulse waves.
-- **Up-to-Date & Recovery States**: Clean status indicators with last-checked timestamp, error recovery retry button, and direct GitHub links.
+### 3. 🤖 Automated GitHub Actions Release Workflow
+- **Continuous Integration & Delivery**: Automated `.github/workflows/release.yml` triggers on tag push (`v*`), executes `flutter analyze` and `flutter test`, builds optimized release APKs, generates SHA-256 checksums, and publishes GitHub releases automatically.
 
 ---
 
-## 🛠 Quality & Performance Improvements
-- 🧪 **100% Test Coverage**: All 80 unit, service, model, and widget tests passing.
+## 🌟 Previous Features (v1.8.0 - v1.8.1)
+
+- **Two-Tier Resilient Check**: GitHub REST API + raw repository / Atom feed rate-limit bypass.
+- **Glassmorphic Startup Dialog**: Non-blocking popup alerting users to new releases.
+- **Interactive Radar Checker**: Manual update scanner modal with pulse wave animations in Settings.
+- **URL-Encoded Release Assets**: Safe `%2B` encoding for trouble-free downloads.
+
+---
+
+## 🛠 Quality & Performance
+- 🧪 **100% Test Coverage**: All 89 unit, service, model, and widget tests passing.
 - ⚡ **Zero Static Analysis Warnings**: Clean pass on `flutter analyze`.
-- 🔒 **Enhanced Data Integrity**: Safe database transactions, cloud sync resilience, and isolated monthly ledgers.
