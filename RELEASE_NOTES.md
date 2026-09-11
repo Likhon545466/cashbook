@@ -1,25 +1,38 @@
-# 🚀 CashBook Release Notes - v1.8.9 (Build 93)
+# 🚀 CashBook Release Notes - v1.8.2 (Build 86)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.9-build93.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.2-build86.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.9
+## 🌟 What's New in v1.8.2
 
-### 1. 🔑 Exact Build 86 Google Authentication Parity
-- **Restored Build 86 Configuration**: Restored the exact Google Client ID configuration (`879746739863-9l6eks9fvu0jg0d194mejg4p8cg7i12g.apps.googleusercontent.com`) and authentication flow that operated cleanly in Build 86.
-- **Drive AppData Sync**: Preserved full Google Drive `appDataFolder` sync and restore capability.
+### 1. 📥 In-App Download Progress & Direct Native Installer
+- **Live Streaming Progress Bar**: Download releases directly within CashBook with animated progress, live speed calculation (`MB/s`), downloaded vs total megabytes display, and cancelability.
+- **Direct Package Installer Launch**: Automatically opens the native Android package installer when download finishes, with resilient fallback to the external browser if needed.
 
-### 2. 🔐 Bundled Keystore for GitHub Actions CI/CD
-- **Zero Signature Divergence**: Bundled the Build 86 release signing keystore (`cashbook.keystore`) directly into the project repository.
-- **CI/CD Matching Fingerprint**: GitHub Actions builds on Ubuntu now sign using the exact same keystore with SHA-1 `01:D1:FE:DE:79:81:2C:DA:86:24:16:40:77:41:FD:9C:8F:D3:7E:A8`, ensuring in-app updates and downloaded GitHub release APKs never fail Google Play Services identity verification.
+### 2. ⚙️ Configurable Auto-Update Check Frequency
+- **Customizable Intervals**: Choose background update check frequency in Settings under **About & Updates**:
+  - `Every Startup` (default)
+  - `Once Daily` (24-hour interval)
+  - `Once a Week` (7-day interval)
+  - `Manual Only`
+- **SQLite State Persistence**: Saves preferences and last-checked timestamps across app reboots.
 
-### 3. 📲 Native Direct Android Package Installer
-- **Native FileProvider & MethodChannel**: 1-tap in-place APK installer without browser redirects.
+### 3. 🤖 Automated GitHub Actions Release Workflow
+- **Continuous Integration & Delivery**: Automated `.github/workflows/release.yml` triggers on tag push (`v*`), executes `flutter analyze` and `flutter test`, builds optimized release APKs, generates SHA-256 checksums, and publishes GitHub releases automatically.
+
+---
+
+## 🌟 Previous Features (v1.8.0 - v1.8.1)
+
+- **Two-Tier Resilient Check**: GitHub REST API + raw repository / Atom feed rate-limit bypass.
+- **Glassmorphic Startup Dialog**: Non-blocking popup alerting users to new releases.
+- **Interactive Radar Checker**: Manual update scanner modal with pulse wave animations in Settings.
+- **URL-Encoded Release Assets**: Safe `%2B` encoding for trouble-free downloads.
 
 ---
 
 ## 🛠 Quality & Performance
 - 🧪 **100% Test Coverage**: All 89 unit, service, model, and widget tests passing.
-- ⚡ **Zero Static Analysis Warnings**: Clean pass on `dart analyze`.
+- ⚡ **Zero Static Analysis Warnings**: Clean pass on `flutter analyze`.

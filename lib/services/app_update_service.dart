@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -120,25 +119,19 @@ class AppUpdateService {
     required String version,
     int? buildNumber,
   }) {
-    final cleanInput = version.startsWith('v') || version.startsWith('V')
+    final cleanVersion = version.startsWith('v') || version.startsWith('V')
         ? version.substring(1)
         : version;
 
-    final baseVersion = cleanInput.split('+').first;
-    final resolvedBuild = buildNumber ??
-        (cleanInput.contains('+')
-            ? int.tryParse(cleanInput.split('+').last)
-            : null);
-
-    if (resolvedBuild != null && resolvedBuild > 0) {
-      final rawTag = 'v$baseVersion+$resolvedBuild';
+    if (buildNumber != null && buildNumber > 0) {
+      final rawTag = 'v$cleanVersion+$buildNumber';
       final encodedTag = Uri.encodeComponent(rawTag);
-      final apkFileName = 'CashBook-v$baseVersion-build$resolvedBuild.apk';
+      final apkFileName = 'CashBook-v$cleanVersion-build$buildNumber.apk';
       return 'https://github.com/$owner/$repo/releases/download/$encodedTag/$apkFileName';
     } else {
-      final rawTag = 'v$baseVersion';
+      final rawTag = 'v$cleanVersion';
       final encodedTag = Uri.encodeComponent(rawTag);
-      final apkFileName = 'CashBook-v$baseVersion.apk';
+      final apkFileName = 'CashBook-v$cleanVersion.apk';
       return 'https://github.com/$owner/$repo/releases/download/$encodedTag/$apkFileName';
     }
   }
@@ -191,15 +184,12 @@ class AppUpdateService {
       final response = await httpClient.send(request);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final errorMsg = response.statusCode == 404
-            ? 'Release APK is not yet attached on GitHub (HTTP 404).'
-            : 'Server responded with HTTP ${response.statusCode}';
         yield DownloadProgress(
           receivedBytes: 0,
           totalBytes: 0,
           progress: 0,
           isFailed: true,
-          errorMessage: errorMsg,
+          errorMessage: 'Server responded with HTTP ${response.statusCode}',
         );
         return;
       }
@@ -280,27 +270,12 @@ class AppUpdateService {
     }
   }
 
-  static const MethodChannel _installerChannel =
-      MethodChannel('com.likhs.cashbook/app_installer');
-
   /// Attempts to launch installation of the downloaded APK file.
   static Future<bool> installApk(String filePath) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return false;
 
-      // 1. Try native Android FileProvider + ACTION_VIEW intent first
-      if (Platform.isAndroid) {
-        try {
-          final success = await _installerChannel.invokeMethod<bool>(
-            'installApk',
-            {'filePath': filePath},
-          );
-          if (success == true) return true;
-        } catch (_) {}
-      }
-
-      // 2. Fallback to Uri.file launch if supported
       final uri = Uri.file(filePath);
       if (await canLaunchUrl(uri)) {
         return await launchUrl(uri, mode: LaunchMode.externalApplication);

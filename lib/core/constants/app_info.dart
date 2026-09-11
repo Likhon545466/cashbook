@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.9';
-  static int _buildNumber = 93;
+  static String _version = '1.8.2';
+  static int _buildNumber = 86;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,80 +58,10 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
-      version: 'v1.8.9',
-      title: 'Full Build 86 Parity & Bundled Keystore for GitHub CI/CD',
-      date: 'September 2026',
-      isLatest: true,
-      highlights: [
-        'Restored exact Build 86 Google Auth logic and configuration.',
-        'Bundled Build 86 release keystore directly into CI/CD pipeline to eliminate signature divergence on GitHub builds.',
-        'Guaranteed identical SHA-1 fingerprint on local builds and GitHub Actions releases.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.8',
-      title: 'Google OAuth Web Client Fix & Cloud Sync',
-      date: 'September 2026',
-      highlights: [
-        'Configured Google Cloud OAuth 2.0 Web Application Client ID for seamless Google Sign-In.',
-        'Added automated legacy Client ID migration in CloudSyncProvider.',
-        'Verified Google Drive AppData backup and restore with full test coverage.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.7',
-      title: 'Restored Build 86 Signing & Verified Google Drive Sync',
-      date: 'September 2026',
-      highlights: [
-        'Restored original build signing configuration exactly matching Build 86.',
-        'Seamless Google Sign-In and Google Drive AppData synchronization.',
-        'Retained direct native Android FileProvider package installer.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.6',
-      title: 'Google Sign-In & Native Installer Production Release',
-      date: 'September 2026',
-      highlights: [
-        'Aligned release signing keystore with Google Cloud OAuth 2.0 Client credentials.',
-        'Verified Google Sign-In and Google Drive Cloud Sync authentication flow.',
-        'Native FileProvider package installer integration for instant 1-tap in-place updates.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.5',
-      title: 'Google OAuth Certificate Alignment & Release Key',
-      date: 'September 2026',
-      highlights: [
-        'Aligned signing certificate SHA-1 fingerprint with Google Cloud Console OAuth client credentials.',
-        'Restored Google Sign-In and Google Drive Cloud Sync functionality on release builds.',
-        'Maintained native direct Android package installer and update integrity.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.4',
-      title: 'Native Android Installer & Unified Release Keystore',
-      date: 'September 2026',
-      highlights: [
-        'Integrated native Android FileProvider + MethodChannel to prompt direct system package installer on completion.',
-        'Unified release signing keystore to resolve Android package signature conflict during in-place app updates.',
-        'Added REQUEST_INSTALL_PACKAGES permission in AndroidManifest.',
-      ],
-    ),
-    ChangelogEntry(
-      version: 'v1.8.3',
-      title: 'Update Link Optimization & Retry Support',
-      date: 'September 2026',
-      highlights: [
-        'Optimized direct APK download URL encoding and tag matching.',
-        'Added 1-tap retry download action and friendly 404 recovery state.',
-        'Enhanced release packaging and build automation.',
-      ],
-    ),
-    ChangelogEntry(
       version: 'v1.8.2',
       title: 'In-App Downloads, Update Frequency & CI/CD',
       date: 'September 2026',
+      isLatest: true,
       highlights: [
         'Live streaming APK download progress bar with speed (MB/s) and percentage.',
         'Direct native APK installer prompt on download completion.',
