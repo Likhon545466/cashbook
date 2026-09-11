@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.2';
-  static int _buildNumber = 86;
+  static String _version = '1.8.3';
+  static int _buildNumber = 87;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.3',
+      title: 'Update Link Optimization & Retry Support',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Optimized direct APK download URL encoding and tag matching.',
+        'Added 1-tap retry download action and friendly 404 recovery state.',
+        'Enhanced release packaging and build automation.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.2',
       title: 'In-App Downloads, Update Frequency & CI/CD',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Live streaming APK download progress bar with speed (MB/s) and percentage.',
         'Direct native APK installer prompt on download completion.',
