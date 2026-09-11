@@ -21,8 +21,8 @@ class AppInfo {
   static const String appTagline = 'Fast, offline-first personal finance management';
 
   // Dynamic version state initialized from PackageInfo
-  static String _version = '1.8.0';
-  static int _buildNumber = 84;
+  static String _version = '1.8.1';
+  static int _buildNumber = 85;
   static bool _initialized = false;
 
   static String get currentVersion => _version;
@@ -58,10 +58,20 @@ class AppInfo {
   // Changelog History
   static const List<ChangelogEntry> changelog = [
     ChangelogEntry(
+      version: 'v1.8.1',
+      title: 'OTA Update Verification & Fixes',
+      date: 'September 2026',
+      isLatest: true,
+      highlights: [
+        'Enhanced in-app update checker verification against live GitHub releases.',
+        'Refined direct APK download link handling and notification triggers.',
+        'Optimized build pipeline and release version packaging.',
+      ],
+    ),
+    ChangelogEntry(
       version: 'v1.8.0',
       title: 'In-App GitHub Release Update System',
       date: 'September 2026',
-      isLatest: true,
       highlights: [
         'Automatic startup update checker with glassmorphic dialog notification.',
         'Interactive in-app update checker modal in Settings with animated radar scanner.',

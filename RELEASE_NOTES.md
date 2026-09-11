@@ -1,11 +1,19 @@
-# 🚀 CashBook Release Notes - v1.8.0 (Build 84)
+# 🚀 CashBook Release Notes - v1.8.1 (Build 85)
 
 **Release Date:** September 11, 2026  
-**Build Target:** Android (Release APK `CashBook-v1.8.0-build84.apk`)
+**Build Target:** Android (Release APK `CashBook-v1.8.1-build85.apk`)
 
 ---
 
-## 🌟 What's New in v1.8.0
+## 🌟 What's New in v1.8.1
+
+- 🔄 **OTA Update Verification**: Real-time update checks against live GitHub releases (`v1.8.1+85`).
+- ⚡ **Direct APK Download Acceleration**: URL-encoded tags (`%2B`) for seamless 1-tap updates.
+- 🚀 **Polished Startup Background Check**: Delayed non-blocking check with session deduplication.
+
+---
+
+## 🌟 Previous Features (v1.8.0)
 
 ### 1. 🔄 In-App GitHub Release Update System
 - **Two-Tier Resilient Check**: Automatically checks GitHub REST API for new releases, with an instant rate-limit-free fallback to `releases.atom` and raw repository version files (`.cashbook_version`, `pubspec.yaml`).
