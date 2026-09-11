@@ -119,19 +119,25 @@ class AppUpdateService {
     required String version,
     int? buildNumber,
   }) {
-    final cleanVersion = version.startsWith('v') || version.startsWith('V')
+    final cleanInput = version.startsWith('v') || version.startsWith('V')
         ? version.substring(1)
         : version;
 
-    if (buildNumber != null && buildNumber > 0) {
-      final rawTag = 'v$cleanVersion+$buildNumber';
+    final baseVersion = cleanInput.split('+').first;
+    final resolvedBuild = buildNumber ??
+        (cleanInput.contains('+')
+            ? int.tryParse(cleanInput.split('+').last)
+            : null);
+
+    if (resolvedBuild != null && resolvedBuild > 0) {
+      final rawTag = 'v$baseVersion+$resolvedBuild';
       final encodedTag = Uri.encodeComponent(rawTag);
-      final apkFileName = 'CashBook-v$cleanVersion-build$buildNumber.apk';
+      final apkFileName = 'CashBook-v$baseVersion-build$resolvedBuild.apk';
       return 'https://github.com/$owner/$repo/releases/download/$encodedTag/$apkFileName';
     } else {
-      final rawTag = 'v$cleanVersion';
+      final rawTag = 'v$baseVersion';
       final encodedTag = Uri.encodeComponent(rawTag);
-      final apkFileName = 'CashBook-v$cleanVersion.apk';
+      final apkFileName = 'CashBook-v$baseVersion.apk';
       return 'https://github.com/$owner/$repo/releases/download/$encodedTag/$apkFileName';
     }
   }
